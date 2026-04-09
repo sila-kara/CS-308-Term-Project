@@ -142,6 +142,7 @@ import { useAuthStore } from "../stores/auth";
 import { useCartStore } from "../stores/cart";
 import { useOrdersStore } from "../stores/orders";
 import { computeCartTotal } from "../utils/cartMath";
+import { decrementStock } from "../data/products.js";
 
 const router = useRouter();
 const { state: authState } = useAuthStore();
@@ -199,6 +200,9 @@ function submitPayment() {
     payError.value = "Could not create order.";
     return;
   }
+  // Decrement stock for each purchased item (Story 12)
+  items.value.forEach((item) => decrementStock(item.id, item.quantity));
+
   lastOrder.value = order;
   clearCart();
   step.value = "success";

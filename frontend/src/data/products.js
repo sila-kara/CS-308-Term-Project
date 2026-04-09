@@ -1,3 +1,5 @@
+import { reactive } from "vue";
+
 function openLibraryCover(serialNumber) {
   const isbn = serialNumber.replace(/^ISBN-/, "");
   return `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`;
@@ -551,9 +553,23 @@ const rawProducts = [
   }
 ]
 
-export const products = rawProducts.map((p) => ({
-  ...p,
-  image: openLibraryCover(p.serialNumber),
-}))
+// Reactive so that stock changes (decrements on purchase) are reflected
+// across all components that reference this array.
+export const products = reactive(
+  rawProducts.map((p) => ({
+    ...p,
+    image: openLibraryCover(p.serialNumber),
+  }))
+);
 
-export const categories = ["All", "Fiction", "Science", "History", "Technology", "Philosophy", "Biography", "Self-Help"]
+/**
+ * Decrease the stock of a product when an order is placed.
+ * Clamps at 0 so quantity never goes negative.
+ */
+export function decrementStock(productId, qty = 1) {
+  const product = products.find((p) => p.id === productId);
+  if (!product) return;
+  product.quantity = Math.max(0, product.quantity - qty);
+}
+
+export const categories = ["All", "Fiction", "Science", "History", "Technology", "Philosophy", "Biography", "Self-Help"];
