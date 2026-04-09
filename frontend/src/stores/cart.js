@@ -1,10 +1,27 @@
 import { reactive, computed } from "vue";
 
 // ---------------------------------------------------------------------------
+// Persistence helpers
+// ---------------------------------------------------------------------------
+const STORAGE_KEY = "bookworld_cart";
+
+function loadCart() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveCart(items) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+}
+
+// ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
 const state = reactive({
-  items: [], // { id, name, price, image, quantity, stock }
+  items: loadCart(), // { id, name, price, image, quantity, stock }
 });
 
 // ---------------------------------------------------------------------------
@@ -23,20 +40,26 @@ function findItem(productId) {
 /**
  * ADD_ITEM
  * Adds one unit of a product to the cart.
- * - Silently returns if stock === 0.
+ * - Silently returns if stock (product.quantity) === 0.
  * - Silently returns if adding one more would exceed available stock.
+ *
+ * Note: the product data model uses `quantity` for available stock.
+ * Inside the cart item we store it as `stock` to avoid naming confusion
+ * with the cart item's own `quantity` (how many the user wants to buy).
  */
 function addToCart(product) {
   if (!product) return;
 
+  const availableStock = product.quantity ?? product.stock ?? 0;
+
   // Guard: product must have stock available
-  if (!product.stock || product.stock <= 0) return;
+  if (availableStock <= 0) return;
 
   const existing = findItem(product.id);
 
   if (existing) {
     // Guard: do not exceed available stock
-    if (existing.quantity >= product.stock) return;
+    if (existing.quantity >= existing.stock) return;
     existing.quantity += 1;
   } else {
     state.items.push({
@@ -44,10 +67,12 @@ function addToCart(product) {
       name: product.name,
       price: product.price,
       image: product.image,
-      stock: product.stock,
+      stock: availableStock,
       quantity: 1,
     });
   }
+
+  saveCart(state.items);
 }
 
 /**
@@ -58,6 +83,7 @@ function removeFromCart(productId) {
   const index = state.items.findIndex((i) => i.id === productId);
   if (index !== -1) {
     state.items.splice(index, 1);
+    saveCart(state.items);
   }
 }
 
@@ -81,6 +107,7 @@ function updateItemQuantity(productId, newQty) {
 
   // Cap at available stock
   item.quantity = Math.min(qty, item.stock);
+  saveCart(state.items);
 }
 
 /**
@@ -89,6 +116,7 @@ function updateItemQuantity(productId, newQty) {
  */
 function clearCart() {
   state.items.splice(0, state.items.length);
+  saveCart(state.items);
 }
 
 // ---------------------------------------------------------------------------
