@@ -1,5 +1,6 @@
 const Order = require("../models/Order");
 const Product = require("../models/Product");
+const sendInvoiceEmail = require("../utils/sendInvoiceEmail");
 
 const STATUS_SEQUENCE = ["processing", "in-transit", "delivered"];
 
@@ -35,6 +36,14 @@ exports.createOrder = async (req, res) => {
       deliveryAddress,
       status: "processing",
     });
+
+    try {
+      const User = require("../models/User");
+      const user = await User.findById(userId);
+      if (user) await sendInvoiceEmail(user.email, order);
+    } catch (emailErr) {
+      console.error("Email error:", emailErr.message);
+    }
 
     res.status(201).json(order);
   } catch (err) {

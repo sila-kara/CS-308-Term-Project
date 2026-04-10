@@ -25,11 +25,10 @@ const orderSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Auto-generate invoice number before saving
-orderSchema.pre("save", function (next) {
+orderSchema.pre("save", async function () {
   if (!this.invoiceNumber) {
     this.invoiceNumber = `INV-${Date.now()}`;
   }
-  next();
 });
 
 module.exports = mongoose.model("Order", orderSchema);

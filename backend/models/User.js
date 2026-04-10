@@ -11,6 +11,7 @@ const userSchema = new mongoose.Schema({
   },
   taxId: { type: String, default: "" },
   address: { type: String, default: "" },
+  wishlist: [{ type: mongoose.Schema.Types.ObjectId, ref: "Product", default: [] }],
 }, { timestamps: true });
 
 module.exports = mongoose.model("User", userSchema);
