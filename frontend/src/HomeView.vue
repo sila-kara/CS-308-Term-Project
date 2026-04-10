@@ -202,7 +202,10 @@
       <div class="market-layout">
         <main class="products-column">
           <section class="products-section">
-            <div class="product-grid" v-if="filteredProducts.length > 0">
+            <p v-if="loadingProducts">Loading books...</p>
+            <p v-else-if="productsError">{{ productsError }}</p>
+
+            <div v-else-if="filteredProducts.length > 0" class="product-grid">
               <ProductCard
                 v-for="product in filteredProducts"
                 :key="product.id"
@@ -256,11 +259,14 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { products, categories } from "../data/products.js";
+import axios from "axios";
 import ProductCard from "../components/ProductCard.vue";
 
 const route = useRoute();
 const router = useRouter();
+const products = ref([]);
+const loadingProducts = ref(false);
+const productsError = ref("");
 
 const localSearch = ref("");
 const selectedCategory = ref("All");
@@ -277,13 +283,15 @@ let heroAutoplayId = null;
 let heroAutoplayPaused = false;
 
 const carouselBestsellerBooks = computed(() =>
-  [...products].sort((a, b) => b.ratingCount - a.ratingCount).slice(0, 3),
+  [...products.value].sort((a, b) => b.ratingCount - a.ratingCount).slice(0, 3),
 );
+
 const carouselNewBooks = computed(() =>
-  [...products].sort((a, b) => b.id - a.id).slice(0, 3),
+  [...products.value].sort((a, b) => b.id - a.id).slice(0, 3),
 );
+
 const carouselDealBooks = computed(() =>
-  [...products].sort((a, b) => a.price - b.price).slice(0, 3),
+  [...products.value].sort((a, b) => a.price - b.price).slice(0, 3),
 );
 
 function prevHeroSlide() {
@@ -323,8 +331,38 @@ function resumeHeroAutoplay() {
   heroAutoplayPaused = false;
 }
 
+async function fetchProducts() {
+  loadingProducts.value = true;
+  productsError.value = "";
+
+  try {
+    const res = await axios.get("http://localhost:5050/api/products");
+
+    products.value = (res.data || []).map((product, index) => ({
+      ...product,
+      id: product._id || product.id || index + 1,
+      image: product.image || "https://via.placeholder.com/300x420?text=Book",
+      category: product.category || "Uncategorized",
+      distributor: product.distributor || "Unknown",
+      author: product.author || "Unknown author",
+      serialNumber: product.serialNumber || "",
+      description: product.description || "",
+      quantity: product.quantity ?? 0,
+      price: Number(product.price ?? 0),
+      rating: Number(product.rating ?? 0),
+      ratingCount: Number(product.ratingCount ?? 0),
+    }));
+  } catch (err) {
+    console.error(err);
+    productsError.value = "Products could not be loaded.";
+  } finally {
+    loadingProducts.value = false;
+  }
+}
+
 onMounted(() => {
   startHeroAutoplay();
+  fetchProducts();
 });
 
 onUnmounted(() => {
@@ -357,9 +395,9 @@ watch(
   },
 );
 
-const categoriesWithoutAll = computed(() =>
-  categories.filter((c) => c !== "All"),
-);
+const categoriesWithoutAll = computed(() => {
+  return [...new Set(products.value.map((p) => p.category).filter(Boolean))];
+});
 
 const showBestsellers = computed(() => {
   const hasSearch = Boolean(localSearch.value.trim());
@@ -458,7 +496,7 @@ const heroSlides = computed(() => [
 ]);
 
 const filteredProducts = computed(() => {
-  let result = [...products];
+  let result = [...products.value];
 
   if (selectedCategory.value !== "All") {
     result = result.filter((p) => p.category === selectedCategory.value);
@@ -501,7 +539,7 @@ const filteredProducts = computed(() => {
 });
 
 const featuredBooks = computed(() => {
-  return [...products].sort((a, b) => b.ratingCount - a.ratingCount).slice(0, 5);
+  return [...products.value].sort((a, b) => b.ratingCount - a.ratingCount).slice(0, 5);
 });
 </script>
 
