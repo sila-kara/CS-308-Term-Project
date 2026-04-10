@@ -1,22 +1,39 @@
 const Comment = require("../models/Comment");
 
+const maskName = (fullName) => {
+  if (!fullName) return "";
+
+  const parts = fullName.trim().split(" ");
+
+  return parts
+    .map(part => {
+      if (!part) return "";
+      return part[0].toUpperCase() + "***";
+    })
+    .join(" ");
+};
+
 exports.createComment = async (req, res) => {
   try {
     const { userId, productId, rating, commentText } = req.body;
 
-    if (!userId || !productId || !rating || !commentText) {
-      return res.status(400).json({ message: "All fields are required" });
+    if (!userId || !productId || !rating) {
+      return res.status(400).json({
+        message: "userId, productId and rating are required"
+      });
     }
 
     if (rating < 1 || rating > 5) {
-      return res.status(400).json({ message: "Rating must be between 1 and 5" });
+      return res.status(400).json({
+        message: "Rating must be between 1 and 5"
+      });
     }
 
     const newComment = new Comment({
       userId,
       productId,
       rating,
-      commentText,
+      commentText: commentText || "",
       status: "pending"
     });
 
@@ -37,11 +54,21 @@ exports.getApprovedCommentsByProduct = async (req, res) => {
     const { productId } = req.params;
 
     const comments = await Comment.find({
-      productId: productId,
+      productId,
       status: "approved"
-    });
+    }).populate("userId", "name");
 
-    res.status(200).json(comments);
+    const formattedComments = comments.map(comment => ({
+      _id: comment._id,
+      productId: comment.productId,
+      rating: comment.rating,
+      commentText: comment.commentText,
+      createdAt: comment.createdAt,
+      maskedUserName: maskName(comment.userId?.name || "")
+    }));
+
+    res.status(200).json(formattedComments);
+
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -50,6 +77,13 @@ exports.getApprovedCommentsByProduct = async (req, res) => {
 exports.approveComment = async (req, res) => {
   try {
     const { commentId } = req.params;
+    const { role } = req.body;
+
+    if (role !== "product_manager") {
+      return res.status(403).json({
+        message: "Only product managers can approve comments"
+      });
+    }
 
     const updatedComment = await Comment.findByIdAndUpdate(
       commentId,
@@ -93,36 +127,6 @@ exports.rejectComment = async (req, res) => {
 
     res.status(200).json({
       message: "Comment rejected successfully",
-      comment: updatedComment
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-exports.approveComment = async (req, res) => {
-  try {
-    const { commentId } = req.params;
-    const { role } = req.body;
-
-    if (role !== "product_manager") {
-      return res.status(403).json({
-        message: "Only product managers can approve comments"
-      });
-    }
-
-    const updatedComment = await Comment.findByIdAndUpdate(
-      commentId,
-      { status: "approved" },
-      { new: true }
-    );
-
-    if (!updatedComment) {
-      return res.status(404).json({ message: "Comment not found" });
-    }
-
-    res.status(200).json({
-      message: "Comment approved successfully",
       comment: updatedComment
     });
   } catch (error) {

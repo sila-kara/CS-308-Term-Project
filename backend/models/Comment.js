@@ -19,7 +19,8 @@ const commentSchema = new mongoose.Schema({
   },
   commentText: {
     type: String,
-    required: true
+    trim: true,
+    default: ""
   },
   status: {
     type: String,
