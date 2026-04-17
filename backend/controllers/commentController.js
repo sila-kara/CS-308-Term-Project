@@ -6,7 +6,7 @@ const maskName = (fullName) => {
   const parts = fullName.trim().split(" ");
 
   return parts
-    .map(part => {
+    .map((part) => {
       if (!part) return "";
       return part[0].toUpperCase() + "***";
     })
@@ -19,13 +19,13 @@ exports.createComment = async (req, res) => {
 
     if (!userId || !productId || !rating) {
       return res.status(400).json({
-        message: "userId, productId and rating are required"
+        message: "userId, productId and rating are required",
       });
     }
 
     if (rating < 1 || rating > 5) {
       return res.status(400).json({
-        message: "Rating must be between 1 and 5"
+        message: "Rating must be between 1 and 5",
       });
     }
 
@@ -34,16 +34,15 @@ exports.createComment = async (req, res) => {
       productId,
       rating,
       commentText: commentText || "",
-      status: "pending"
+      status: "pending",
     });
 
     await newComment.save();
 
     res.status(201).json({
       message: "Comment submitted successfully",
-      comment: newComment
+      comment: newComment,
     });
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -55,20 +54,42 @@ exports.getApprovedCommentsByProduct = async (req, res) => {
 
     const comments = await Comment.find({
       productId,
-      status: "approved"
+      status: "approved",
     }).populate("userId", "name");
 
-    const formattedComments = comments.map(comment => ({
+    const formattedComments = comments.map((comment) => ({
       _id: comment._id,
       productId: comment.productId,
       rating: comment.rating,
       commentText: comment.commentText,
       createdAt: comment.createdAt,
-      maskedUserName: maskName(comment.userId?.name || "")
+      maskedUserName: maskName(comment.userId?.name || ""),
     }));
 
     res.status(200).json(formattedComments);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
+exports.getPendingComments = async (req, res) => {
+  try {
+    const comments = await Comment.find({
+      status: "pending",
+    })
+      .populate("userId", "name")
+      .sort({ createdAt: -1 });
+
+    const formattedComments = comments.map((comment) => ({
+      _id: comment._id,
+      productId: comment.productId,
+      rating: comment.rating,
+      commentText: comment.commentText,
+      createdAt: comment.createdAt,
+      maskedUserName: maskName(comment.userId?.name || ""),
+    }));
+
+    res.status(200).json(formattedComments);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -81,7 +102,7 @@ exports.approveComment = async (req, res) => {
 
     if (role !== "product_manager") {
       return res.status(403).json({
-        message: "Only product managers can approve comments"
+        message: "Only product managers can approve comments",
       });
     }
 
@@ -97,7 +118,7 @@ exports.approveComment = async (req, res) => {
 
     res.status(200).json({
       message: "Comment approved successfully",
-      comment: updatedComment
+      comment: updatedComment,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -111,7 +132,7 @@ exports.rejectComment = async (req, res) => {
 
     if (role !== "product_manager") {
       return res.status(403).json({
-        message: "Only product managers can reject comments"
+        message: "Only product managers can reject comments",
       });
     }
 
@@ -127,7 +148,7 @@ exports.rejectComment = async (req, res) => {
 
     res.status(200).json({
       message: "Comment rejected successfully",
-      comment: updatedComment
+      comment: updatedComment,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -140,13 +161,13 @@ exports.getAverageRating = async (req, res) => {
 
     const comments = await Comment.find({
       productId,
-      status: "approved"
+      status: "approved",
     });
 
     if (comments.length === 0) {
       return res.status(200).json({
         averageRating: 0,
-        totalComments: 0
+        totalComments: 0,
       });
     }
 
@@ -155,9 +176,8 @@ exports.getAverageRating = async (req, res) => {
 
     res.status(200).json({
       averageRating: average,
-      totalComments: comments.length
+      totalComments: comments.length,
     });
-
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

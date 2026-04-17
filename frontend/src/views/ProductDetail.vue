@@ -12,8 +12,8 @@
         <p class="serial">Serial: {{ product.serialNumber }}</p>
 
         <div class="rating-section">
-          <span class="stars">★ {{ product.rating }}</span>
-          <span class="count">({{ product.ratingCount }} reviews)</span>
+          <span class="stars">★ {{ averageRating ? averageRating.toFixed(1) : "0.0" }}</span>
+          <span class="count">({{ totalComments }} reviews)</span>
         </div>
 
         <p class="description">{{ product.description }}</p>
@@ -82,7 +82,8 @@
         <p>Only approved reviews are shown publicly.</p>
       </div>
 
-      <ul v-if="approvedReviews.length" class="review-list">
+      <p v-if="loadingComments" class="no-reviews">Loading reviews...</p>
+      <ul v-else-if="approvedReviews.length" class="review-list">
         <li v-for="r in approvedReviews" :key="r.id">
           <div class="review-top">
             <strong>{{ r.authorName }}</strong>
@@ -125,28 +126,21 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, ref, watch, onMounted } from "vue";
+import axios from "axios";
 import { useRoute, useRouter } from "vue-router";
-import { products } from "../data/products.js";
 import { useCartStore } from "../stores/cart";
 import { useAuthStore } from "../stores/auth";
-import { useCommentsStore } from "../stores/comments";
 
 const route = useRoute();
 const router = useRouter();
 const { addToCart } = useCartStore();
 const { isLoggedIn, state: authState } = useAuthStore();
-const { listApprovedForProduct, submitReview: postReview } =
-  useCommentsStore();
 
-const product = computed(() => {
-  const id = Number(route.params.id);
-  return products.find((p) => p.id === id);
-});
-
-const approvedReviews = computed(() =>
-  product.value ? listApprovedForProduct(product.value.id) : [],
-);
+const product = ref(null);
+const approvedReviews = ref([]);
+const averageRating = ref(0);
+const totalComments = ref(0);
 
 const draftRating = ref(5);
 const draftText = ref("");
@@ -154,15 +148,118 @@ const reviewError = ref("");
 const reviewSuccess = ref("");
 const cartMessage = ref("");
 
+const loadingProduct = ref(false);
+const loadingComments = ref(false);
+const pageError = ref("");
+
+const productId = computed(() => route.params.id);
+
+async function fetchProduct() {
+  loadingProduct.value = true;
+  pageError.value = "";
+
+  try {
+    const res = await axios.get("http://localhost:5050/api/products");
+    const found = (res.data || []).find(
+      (p) => String(p._id || p.id) === String(productId.value),
+    );
+
+    if (!found) {
+      product.value = null;
+      return;
+    }
+
+    product.value = {
+      ...found,
+      id: found._id || found.id,
+      image: found.image || "https://via.placeholder.com/300x420?text=Book",
+      category: found.category || "Uncategorized",
+      model: found.model || "",
+      serialNumber: found.serialNumber || "",
+      description: found.description || "",
+      distributor: found.distributor || "Unknown",
+      warranty: found.warrantyStatus || found.warranty || "N/A",
+      quantity: found.quantity ?? 0,
+      price: Number(found.price ?? 0),
+      rating: Number(found.rating ?? 0),
+      ratingCount: Number(found.ratingCount ?? 0),
+    };
+  } catch (err) {
+    console.error(err);
+    pageError.value = "Product could not be loaded.";
+  } finally {
+    loadingProduct.value = false;
+  }
+}
+
+async function fetchApprovedReviews() {
+  if (!productId.value) return;
+
+  loadingComments.value = true;
+
+  try {
+    const res = await axios.get(
+      `http://localhost:5050/api/comments/${productId.value}`,
+    );
+
+    approvedReviews.value = (res.data || []).map((comment) => ({
+      id: comment._id,
+      authorName: comment.maskedUserName || "Anonymous",
+      rating: Number(comment.rating ?? 0),
+      text: comment.commentText || "",
+      createdAt: comment.createdAt,
+    }));
+  } catch (err) {
+    console.error(err);
+    approvedReviews.value = [];
+  } finally {
+    loadingComments.value = false;
+  }
+}
+
+async function fetchAverageRating() {
+  if (!productId.value) return;
+
+  try {
+    const res = await axios.get(
+      `http://localhost:5050/api/comments/average/${productId.value}`,
+    );
+
+    averageRating.value = Number(res.data?.averageRating ?? 0);
+    totalComments.value = Number(res.data?.totalComments ?? 0);
+
+    if (product.value) {
+      product.value.rating = averageRating.value;
+      product.value.ratingCount = totalComments.value;
+    }
+  } catch (err) {
+    console.error(err);
+    averageRating.value = 0;
+    totalComments.value = 0;
+  }
+}
+
+async function loadPageData() {
+  await fetchProduct();
+  await fetchApprovedReviews();
+  await fetchAverageRating();
+}
+
 watch(
-  () => product.value?.id,
-  () => {
+  () => productId.value,
+  async () => {
     reviewError.value = "";
     reviewSuccess.value = "";
     draftText.value = "";
     draftRating.value = 5;
+    await loadPageData();
   },
+  { immediate: true },
 );
+
+onMounted(async () => {
+  await loadPageData();
+});
 
 function addCurrentProductToCart() {
   if (!product.value) return;
@@ -173,23 +270,41 @@ function addCurrentProductToCart() {
   }, 2400);
 }
 
-function submitReview() {
+async function submitReview() {
   reviewError.value = "";
   reviewSuccess.value = "";
+
   if (!product.value) return;
-  const res = postReview({
-    productId: product.value.id,
-    authorName: authState.user?.name || "Reader",
-    rating: draftRating.value,
-    text: draftText.value,
-  });
-  if (!res.ok) {
-    reviewError.value = res.error;
+
+  if (!isLoggedIn) {
+    reviewError.value = "You need to sign in first.";
     return;
   }
-  reviewSuccess.value =
-    "Thanks! Your review will appear after a product manager approves it.";
-  draftText.value = "";
+
+  if (!draftRating.value || draftRating.value < 1 || draftRating.value > 5) {
+    reviewError.value = "Rating must be between 1 and 5.";
+    return;
+  }
+
+  try {
+    await axios.post("http://localhost:5050/api/comments", {
+      userId: authState.user?._id || authState.user?.id,
+      productId: product.value.id,
+      rating: draftRating.value,
+      commentText: draftText.value,
+    });
+
+    reviewSuccess.value =
+      "Thanks! Your review was submitted and is waiting for approval.";
+    draftText.value = "";
+    draftRating.value = 5;
+    await fetchApprovedReviews();
+    await fetchAverageRating();
+  } catch (err) {
+    console.error(err);
+    reviewError.value =
+      err.response?.data?.message || "Review could not be submitted.";
+  }
 }
 </script>
 

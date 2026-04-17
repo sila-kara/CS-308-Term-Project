@@ -2,8 +2,7 @@
   <div class="admin">
     <h1>Review moderation</h1>
     <p class="lead">
-      Product manager console (demo). Approve reviews before they appear on
-      product pages.
+      Product manager console. Approve reviews before they appear on product pages.
     </p>
 
     <div v-if="!unlocked" class="gate">
@@ -17,17 +16,20 @@
     </div>
 
     <div v-else>
-      <p v-if="pending.length === 0" class="empty">No pending reviews.</p>
+      <p v-if="loading" class="empty">Loading pending reviews...</p>
+      <p v-else-if="actionError" class="error">{{ actionError }}</p>
+      <p v-else-if="pending.length === 0" class="empty">No pending reviews.</p>
+
       <ul v-else class="list">
         <li v-for="item in pending" :key="item.id">
           <div>
             <p class="title">
-              {{ item.authorName }} · {{ item.rating }}★ · product
-              #{{ item.productId }}
+              {{ item.authorName }} · {{ item.rating }}★ · product #{{ item.productId }}
             </p>
             <p class="text">{{ item.text }}</p>
             <p class="meta">{{ formatDate(item.createdAt) }}</p>
           </div>
+
           <div class="actions">
             <button type="button" class="ok" @click="approve(item.id)">
               Approve
@@ -43,36 +45,87 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
-import { useCommentsStore } from "../stores/comments";
+import { ref, onMounted } from "vue";
+import axios from "axios";
 
 const ADMIN_KEY = "bookworld_admin_unlocked";
 const DEMO_PASS = "demo";
-
-const { listPending, approveReview, rejectReview } = useCommentsStore();
 
 const unlocked = ref(localStorage.getItem(ADMIN_KEY) === "1");
 const passcode = ref("");
 const gateError = ref("");
 
-const pending = computed(() => listPending());
+const pending = ref([]);
+const loading = ref(false);
+const actionError = ref("");
+
+async function fetchPending() {
+  loading.value = true;
+  actionError.value = "";
+
+  try {
+    const res = await axios.get("http://localhost:5050/api/comments/pending/all");
+
+    pending.value = (res.data || []).map((item) => ({
+      id: item._id,
+      authorName: item.maskedUserName || "Anonymous",
+      rating: item.rating,
+      productId: item.productId,
+      text: item.commentText || "",
+      createdAt: item.createdAt,
+    }));
+  } catch (err) {
+    console.error(err);
+    actionError.value =
+      err.response?.data?.message || "Pending reviews could not be loaded.";
+  } finally {
+    loading.value = false;
+  }
+}
 
 function tryUnlock() {
   gateError.value = "";
+
   if (passcode.value === DEMO_PASS) {
     localStorage.setItem(ADMIN_KEY, "1");
     unlocked.value = true;
+    fetchPending();
     return;
   }
+
   gateError.value = "Invalid passcode.";
 }
 
-function approve(id) {
-  approveReview(id);
+async function approve(id) {
+  actionError.value = "";
+
+  try {
+    await axios.patch(`http://localhost:5050/api/comments/approve/${id}`, {
+      role: "product_manager",
+    });
+
+    await fetchPending();
+  } catch (err) {
+    console.error(err);
+    actionError.value =
+      err.response?.data?.message || "Approve action failed.";
+  }
 }
 
-function reject(id) {
-  rejectReview(id);
+async function reject(id) {
+  actionError.value = "";
+
+  try {
+    await axios.patch(`http://localhost:5050/api/comments/reject/${id}`, {
+      role: "product_manager",
+    });
+
+    await fetchPending();
+  } catch (err) {
+    console.error(err);
+    actionError.value =
+      err.response?.data?.message || "Reject action failed.";
+  }
 }
 
 function formatDate(iso) {
@@ -82,6 +135,12 @@ function formatDate(iso) {
     return iso;
   }
 }
+
+onMounted(() => {
+  if (unlocked.value) {
+    fetchPending();
+  }
+});
 </script>
 
 <style scoped>

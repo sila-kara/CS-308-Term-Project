@@ -1,30 +1,36 @@
 <template>
   <div class="auth-page">
     <div class="auth-card">
-      <h1>Sign in</h1>
-      <p class="lead">Access your orders and checkout securely.</p>
+      <h1>Create account</h1>
+      <p class="lead">Save carts securely and track deliveries.</p>
 
       <form class="form" @submit.prevent="onSubmit">
         <label>
+          <span>Full name</span>
+          <input v-model="name" type="text" autocomplete="name" required />
+        </label>
+        <label>
           <span>Email</span>
-          <input v-model="email" type="email" autocomplete="username" required />
+          <input v-model="email" type="email" autocomplete="email" required />
         </label>
         <label>
           <span>Password</span>
           <input
             v-model="password"
             type="password"
-            autocomplete="current-password"
+            autocomplete="new-password"
             required
           />
         </label>
         <p v-if="error" class="error">{{ error }}</p>
-        <button class="btn primary" type="submit">Sign in</button>
+        <button class="btn primary" type="submit" :disabled="loading">
+          {{ loading ? "Registering..." : "Register" }}
+        </button>
       </form>
 
       <p class="footer">
-        New to BookWorld?
-        <router-link to="/register">Create an account</router-link>
+        Already have an account?
+        <router-link to="/login">Sign in</router-link>
       </p>
     </div>
   </div>
@@ -32,29 +38,38 @@
 
 <script setup>
 import { ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 
 const router = useRouter();
-const route = useRoute();
-const { login } = useAuthStore();
+const { register } = useAuthStore();
 
+const name = ref("");
 const email = ref("");
 const password = ref("");
 const error = ref("");
+const loading = ref(false);
 
-function onSubmit() {
+async function onSubmit() {
   error.value = "";
-  const res = login({
-    email: email.value,
-    password: password.value,
-  });
-  if (!res.ok) {
-    error.value = res.error;
-    return;
+  loading.value = true;
+
+  try {
+    const res = await register({
+      name: name.value,
+      email: email.value,
+      password: password.value,
+    });
+
+    if (!res.ok) {
+      error.value = res.error;
+      return;
+    }
+
+    router.push("/");
+  } finally {
+    loading.value = false;
   }
-  const redirect = route.query.redirect;
-  router.push(typeof redirect === "string" ? redirect : "/");
 }
 </script>
 
@@ -123,6 +138,11 @@ input {
 .btn.primary {
   background: linear-gradient(145deg, #1d4ed8, #2563eb);
   color: white;
+}
+
+.btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .footer {
