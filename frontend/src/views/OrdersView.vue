@@ -5,7 +5,9 @@
       <router-link to="/">Back to shop</router-link>
     </div>
 
-    <p v-if="rows.length === 0" class="empty">You have no orders yet.</p>
+    <p v-if="loading" class="empty">Loading orders...</p>
+    <p v-else-if="error" class="empty">{{ error }}</p>
+    <p v-else-if="rows.length === 0" class="empty">You have no orders yet.</p>
 
     <ul v-else class="list">
       <li v-for="order in rows" :key="order.id">
@@ -24,15 +26,32 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
-import { useAuthStore } from "../stores/auth";
-import { useOrdersStore } from "../stores/orders";
+import { ref, onMounted } from "vue";
+import axios from "axios";
 import { statusLabel } from "../utils/orderStatus";
 
-const { state: authState } = useAuthStore();
-const { listByUserId } = useOrdersStore();
+const rows = ref([]);
+const loading = ref(true);
+const error = ref("");
 
-const rows = computed(() => listByUserId(authState.user?.id));
+async function fetchOrders() {
+  loading.value = true;
+  error.value = "";
+
+  try {
+    const res = await axios.get("http://localhost:5050/api/orders");
+
+    rows.value = (res.data || []).map((order) => ({
+      ...order,
+      id: order._id || order.id,
+    }));
+  } catch (err) {
+    console.error(err);
+    error.value = err.response?.data?.message || "Orders could not be loaded.";
+  } finally {
+    loading.value = false;
+  }
+}
 
 function formatDate(iso) {
   try {
@@ -45,6 +64,10 @@ function formatDate(iso) {
 function label(s) {
   return statusLabel(s);
 }
+
+onMounted(() => {
+  fetchOrders();
+});
 </script>
 
 <style scoped>

@@ -138,16 +138,14 @@
 <script setup>
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
+import axios from "axios";
 import { useAuthStore } from "../stores/auth";
 import { useCartStore } from "../stores/cart";
-import { useOrdersStore } from "../stores/orders";
 import { computeCartTotal } from "../utils/cartMath";
-import { decrementStock } from "../data/products.js";
 
 const router = useRouter();
 const { state: authState } = useAuthStore();
 const { state: cartState, clearCart } = useCartStore();
-const { createOrder } = useOrdersStore();
 
 const step = ref("pay");
 const lastOrder = ref(null);
@@ -177,35 +175,49 @@ function formatDate(iso) {
   }
 }
 
-function submitPayment() {
+async function submitPayment() {
   payError.value = "";
+
   if (!authState.user) {
     router.push({ path: "/login", query: { redirect: "/checkout" } });
     return;
   }
+
   if (items.value.length === 0) {
     payError.value = "Cart is empty.";
     return;
   }
-  const order = createOrder({
-    userId: authState.user.id,
-    items: items.value,
-    subtotal: subtotal.value,
-    tax: tax.value,
-    total: total.value,
-    paymentMethod: "Mock Visa",
-    cardLast4: last4(cardNumber.value),
-  });
-  if (!order) {
-    payError.value = "Could not create order.";
-    return;
-  }
-  // Decrement stock for each purchased item (Story 12)
-  items.value.forEach((item) => decrementStock(item.id, item.quantity));
 
-  lastOrder.value = order;
-  clearCart();
-  step.value = "success";
+  try {
+    const payload = {
+      items: items.value.map((item) => ({
+        productId: item.id,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+      })),
+      subtotal: subtotal.value,
+      tax: tax.value,
+      total: total.value,
+      paymentMethod: "Mock Visa",
+      cardLast4: last4(cardNumber.value),
+      deliveryAddress: authState.user?.address || authState.user?.homeAddress || "",
+    };
+
+    const res = await axios.post("http://localhost:5050/api/orders", payload);
+
+    lastOrder.value = {
+      ...res.data,
+      id: res.data._id || res.data.id,
+    };
+
+    clearCart();
+    step.value = "success";
+  } catch (err) {
+    console.error(err);
+    payError.value =
+      err.response?.data?.message || "Could not complete payment.";
+  }
 }
 </script>
 
