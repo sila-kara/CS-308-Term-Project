@@ -287,17 +287,23 @@ async function submitReview() {
   }
 
   try {
-    await axios.post("http://localhost:5050/api/comments", {
+    const res = await axios.post("http://localhost:5050/api/comments", {
       userId: authState.user?._id || authState.user?.id,
       productId: product.value.id,
       rating: draftRating.value,
       commentText: draftText.value,
     });
 
-    reviewSuccess.value =
-      "Thanks! Your review was submitted and is waiting for approval.";
+    if (res.data.autoApproved) {
+      reviewSuccess.value = "Thanks! Your rating was submitted.";
+    } else {
+      reviewSuccess.value =
+        "Thanks! Your review was submitted and is waiting for approval.";
+    }
+
     draftText.value = "";
     draftRating.value = 5;
+
     await fetchApprovedReviews();
     await fetchAverageRating();
   } catch (err) {

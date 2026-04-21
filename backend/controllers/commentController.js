@@ -19,29 +19,36 @@ exports.createComment = async (req, res) => {
 
     if (!userId || !productId || !rating) {
       return res.status(400).json({
-        message: "userId, productId and rating are required",
+        message: "userId, productId and rating are required"
       });
     }
 
     if (rating < 1 || rating > 5) {
       return res.status(400).json({
-        message: "Rating must be between 1 and 5",
+        message: "Rating must be between 1 and 5"
       });
     }
+
+    const trimmedComment = String(commentText || "").trim();
+    const status = trimmedComment ? "pending" : "approved";
 
     const newComment = new Comment({
       userId,
       productId,
       rating,
-      commentText: commentText || "",
-      status: "pending",
+      commentText: trimmedComment,
+      status
     });
 
     await newComment.save();
 
     res.status(201).json({
-      message: "Comment submitted successfully",
+      message:
+        status === "approved"
+          ? "Rating submitted successfully"
+          : "Comment submitted successfully and is waiting for approval",
       comment: newComment,
+      autoApproved: status === "approved"
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
