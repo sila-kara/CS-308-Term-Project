@@ -39,7 +39,24 @@ function loadSession() {
 
 loadSession();
 
+if (state.token) {
+  axios.defaults.headers.common["Authorization"] = `Bearer ${state.token}`;
+}
+
 const isLoggedIn = computed(() => !!state.user && !!state.token);
+
+async function fetchMe() {
+  if (!state.token) return;
+
+  try {
+    const res = await axios.get("http://localhost:5050/api/auth/me");
+    state.user = res.data;
+    persistSession();
+  } catch (err) {
+    console.error(err);
+    logout();
+  }
+}
 
 async function register({ email, password, name }) {
   const e = String(email || "").trim().toLowerCase();
@@ -66,6 +83,8 @@ async function register({ email, password, name }) {
 
     state.user = res.data.user;
     state.token = res.data.token;
+
+    axios.defaults.headers.common["Authorization"] = `Bearer ${state.token}`;
     persistSession();
 
     return { ok: true };
@@ -96,6 +115,8 @@ async function login({ email, password }) {
 
     state.user = res.data.user;
     state.token = res.data.token;
+
+    axios.defaults.headers.common["Authorization"] = `Bearer ${state.token}`;
     persistSession();
 
     return { ok: true };
@@ -110,8 +131,12 @@ async function login({ email, password }) {
 function logout() {
   state.user = null;
   state.token = null;
+
+  delete axios.defaults.headers.common["Authorization"];
   persistSession();
 }
+
+fetchMe();
 
 export function useAuthStore() {
   return {
@@ -120,5 +145,6 @@ export function useAuthStore() {
     register,
     login,
     logout,
+    fetchMe,
   };
 }
