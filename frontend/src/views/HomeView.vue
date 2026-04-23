@@ -136,7 +136,7 @@
             <option value="default">Featured first</option>
             <option value="price-asc">Price: Low to high</option>
             <option value="price-desc">Price: High to low</option>
-            <option value="rating">Top rated</option>
+            <option value="popularity">Most popular</option>
             <option value="newest">Newest arrivals</option>
           </select>
         </div>
@@ -374,7 +374,7 @@ watch(
   (query) => {
     localSearch.value = query.search || "";
     selectedCategory.value = query.category || "All";
-    sortBy.value = query.sort || "default";
+    sortBy.value = query.sort === "rating" ? "popularity" : (query.sort || "default");
     inStockOnly.value = query.stock === "1";
   },
   { immediate: true },
@@ -529,8 +529,8 @@ const filteredProducts = computed(() => {
     result.sort((a, b) => a.price - b.price);
   } else if (sortBy.value === "price-desc") {
     result.sort((a, b) => b.price - a.price);
-  } else if (sortBy.value === "rating") {
-    result.sort((a, b) => b.rating - a.rating);
+  } else if (sortBy.value === "popularity") {
+    result.sort((a, b) => (b.ratingCount ?? 0) - (a.ratingCount ?? 0) ||(b.rating ?? 0) - (a.rating ?? 0),);
   } else if (sortBy.value === "newest") {
     result.sort((a, b) => b.id - a.id);
   }
