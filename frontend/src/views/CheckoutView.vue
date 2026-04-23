@@ -111,8 +111,8 @@
             </label>
           </div>
           <p v-if="payError" class="error">{{ payError }}</p>
-          <button class="btn primary full" type="submit" :disabled="items.length === 0">
-            Pay {{ total.toFixed(2) }} TL
+          <button class="btn primary full" type="submit" :disabled="items.length === 0 || isPaying">
+            {{ isPaying ? "Processing..." : "Pay Now" }}
           </button>
         </form>
 
@@ -138,18 +138,16 @@
 <script setup>
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
-import axios from "axios";
-import { useAuthStore } from "../stores/auth";
 import { useCartStore } from "../stores/cart";
 import { computeCartTotal } from "../utils/cartMath";
 
 const router = useRouter();
-const { state: authState } = useAuthStore();
 const { state: cartState, clearCart } = useCartStore();
 
 const step = ref("pay");
 const lastOrder = ref(null);
 const payError = ref("");
+const isPaying = ref(false);
 
 const cardName = ref("");
 const cardNumber = ref("");
@@ -178,7 +176,8 @@ function formatDate(iso) {
 async function submitPayment() {
   payError.value = "";
 
-  if (!authState.user) {
+  const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+  if (!isLoggedIn) {
     router.push({ path: "/login", query: { redirect: "/checkout" } });
     return;
   }
@@ -189,9 +188,17 @@ async function submitPayment() {
   }
 
   try {
-    const payload = {
+    isPaying.value = true;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    const now = new Date();
+    const mockId = `MOCK-${now.getTime()}`;
+    lastOrder.value = {
+      id: mockId,
+      invoiceNumber: `INV-${now.getFullYear()}-${String(now.getTime()).slice(-6)}`,
+      createdAt: now.toISOString(),
       items: items.value.map((item) => ({
-        productId: item.id,
+        id: item.id,
         name: item.name,
         price: item.price,
         quantity: item.quantity,
@@ -201,22 +208,14 @@ async function submitPayment() {
       total: total.value,
       paymentMethod: "Mock Visa",
       cardLast4: last4(cardNumber.value),
-      deliveryAddress: authState.user?.address || authState.user?.homeAddress || "",
     };
-
-    const res = await axios.post("http://localhost:5050/api/orders", payload);
-
-    lastOrder.value = {
-      ...res.data,
-      id: res.data._id || res.data.id,
-    };
-
     clearCart();
     step.value = "success";
   } catch (err) {
     console.error(err);
-    payError.value =
-      err.response?.data?.message || "Could not complete payment.";
+    payError.value = "Could not complete payment.";
+  } finally {
+    isPaying.value = false;
   }
 }
 </script>

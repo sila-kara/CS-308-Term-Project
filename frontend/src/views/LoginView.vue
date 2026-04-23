@@ -7,12 +7,12 @@
       <form class="form" @submit.prevent="onSubmit">
         <label>
           <span>Email</span>
-          <input v-model="email" type="email" autocomplete="username" required />
+          <input v-model="form.email" type="email" autocomplete="username" required />
         </label>
         <label>
           <span>Password</span>
           <input
-            v-model="password"
+            v-model="form.password"
             type="password"
             autocomplete="current-password"
             required
@@ -34,35 +34,31 @@
 
 <script setup>
 import { ref } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import { useAuthStore } from "../stores/auth";
+import { useRouter } from "vue-router";
 
 const router = useRouter();
-const route = useRoute();
-const { login } = useAuthStore();
-
-const email = ref("");
-const password = ref("");
+const form = ref({
+  email: "",
+  password: "",
+});
 const error = ref("");
 const loading = ref(false);
 
 async function onSubmit() {
   error.value = "";
+  const email = form.value.email.trim();
+  const password = form.value.password.trim();
+
+  if (!email || !password) {
+    error.value = "Please fill in both email and password.";
+    return;
+  }
+
   loading.value = true;
-
   try {
-    const res = await login({
-      email: email.value,
-      password: password.value,
-    });
-
-    if (!res.ok) {
-      error.value = res.error;
-      return;
-    }
-
-    const redirect = route.query.redirect;
-    router.push(typeof redirect === "string" ? redirect : "/");
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    localStorage.setItem("isLoggedIn", "true");
+    router.push("/");
   } finally {
     loading.value = false;
   }

@@ -7,16 +7,16 @@
       <form class="form" @submit.prevent="onSubmit">
         <label>
           <span>Full name</span>
-          <input v-model="name" type="text" autocomplete="name" required />
+          <input v-model="form.name" type="text" autocomplete="name" required />
         </label>
         <label>
           <span>Email</span>
-          <input v-model="email" type="email" autocomplete="email" required />
+          <input v-model="form.email" type="email" autocomplete="email" required />
         </label>
         <label>
           <span>Password</span>
           <input
-            v-model="password"
+            v-model="form.password"
             type="password"
             autocomplete="new-password"
             required
@@ -39,34 +39,42 @@
 <script setup>
 import { ref } from "vue";
 import { useRouter } from "vue-router";
-import { useAuthStore } from "../stores/auth";
 
 const router = useRouter();
-const { register } = useAuthStore();
-
-const name = ref("");
-const email = ref("");
-const password = ref("");
+const form = ref({
+  name: "",
+  email: "",
+  password: "",
+});
 const error = ref("");
 const loading = ref(false);
 
 async function onSubmit() {
   error.value = "";
+  const name = form.value.name.trim();
+  const email = form.value.email.trim();
+  const password = form.value.password.trim();
+
+  if (!name || !email || !password) {
+    error.value = "Please fill in name, email, and password.";
+    return;
+  }
+
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailPattern.test(email)) {
+    error.value = "Please enter a valid email address.";
+    return;
+  }
+
+  if (password.length < 6) {
+    error.value = "Password must be at least 6 characters.";
+    return;
+  }
+
   loading.value = true;
-
   try {
-    const res = await register({
-      name: name.value,
-      email: email.value,
-      password: password.value,
-    });
-
-    if (!res.ok) {
-      error.value = res.error;
-      return;
-    }
-
-    router.push("/");
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    router.push("/login");
   } finally {
     loading.value = false;
   }

@@ -9,7 +9,6 @@ import OrdersView from "../views/OrdersView.vue";
 import OrderDetailView from "../views/OrderDetailView.vue";
 import AdminReviewsView from "../views/AdminReviewsView.vue";
 import WishlistView from "../views/WishlistView.vue";
-import { useAuthStore } from "../stores/auth";
 
 const router = createRouter({
   history: createWebHistory(),
@@ -71,8 +70,8 @@ const router = createRouter({
 });
 
 router.beforeEach((to) => {
-  const { isLoggedIn } = useAuthStore();
-  if (to.meta.requiresAuth && !isLoggedIn.value) {
+  const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
+  if (to.meta.requiresAuth && !isLoggedIn) {
     return {
       path: "/login",
       query: { redirect: to.fullPath },
