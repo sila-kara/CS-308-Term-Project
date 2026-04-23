@@ -1,14 +1,13 @@
-import { createRouter, createWebHistory } from "vue-router";
-import HomeView from "../views/HomeView.vue";
-import ProductDetail from "../views/ProductDetail.vue";
-import CartView from "../views/CartView.vue";
-import CheckoutView from "../views/CheckoutView.vue";
-import LoginView from "../views/LoginView.vue";
-import RegisterView from "../views/RegisterView.vue";
-import OrdersView from "../views/OrdersView.vue";
-import OrderDetailView from "../views/OrderDetailView.vue";
-import AdminReviewsView from "../views/AdminReviewsView.vue";
-import WishlistView from "../views/WishlistView.vue";
+import HomeView from "../HomeView.vue";
+import ProductDetail from "../ProductDetail.vue";
+import CartView from "../CartView.vue";
+import CheckoutView from "../CheckoutView.vue";
+import LoginView from "../LoginView.vue";
+import RegisterView from "../RegisterView.vue";
+import OrdersView from "../OrdersView.vue";
+import OrderDetailView from "../OrderDetailView.vue";
+import AdminReviewsView from "../AdminReviewsView.vue";
+import WishlistView from "../WishlistView.vue";
 import { useAuthStore } from "../stores/auth";
 
 const router = createRouter({
