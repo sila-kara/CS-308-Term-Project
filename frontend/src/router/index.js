@@ -9,6 +9,8 @@ import OrdersView from "../views/OrdersView.vue";
 import OrderDetailView from "../views/OrderDetailView.vue";
 import AdminReviewsView from "../views/AdminReviewsView.vue";
 import WishlistView from "../views/WishlistView.vue";
+import ProductManagerView from "../views/ProductManagerView.vue";
+import { useAuthStore } from "../stores/auth";
 
 const router = createRouter({
   history: createWebHistory(),
@@ -66,16 +68,22 @@ const router = createRouter({
       name: "admin-reviews",
       component: AdminReviewsView,
     },
+    {
+      path: "/admin/product-manager",
+      name: "product-manager",
+      component: ProductManagerView,
+      meta: { requiresAuth: true, requiresRole: "product_manager" },
+    },
   ],
 });
 
 router.beforeEach((to) => {
-  const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
-  if (to.meta.requiresAuth && !isLoggedIn) {
-    return {
-      path: "/login",
-      query: { redirect: to.fullPath },
-    };
+  const { isLoggedIn, state } = useAuthStore();
+  if (to.meta.requiresAuth && !isLoggedIn.value) {
+    return { path: "/login", query: { redirect: to.fullPath } };
+  }
+  if (to.meta.requiresRole && state.user?.role !== to.meta.requiresRole) {
+    return { path: "/" };
   }
   return true;
 });
