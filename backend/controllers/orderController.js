@@ -72,6 +72,17 @@ exports.getOrderById = async (req, res) => {
   }
 };
 
+exports.getAllOrders = async (req, res) => {
+  try {
+    const orders = await Order.find()
+      .populate("userId", "name email address")
+      .sort({ createdAt: -1 });
+    res.json(orders);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 exports.advanceStatus = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
