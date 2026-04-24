@@ -12,33 +12,23 @@
       <div class="footer-container">
         <div class="footer-col">
           <h4>Get to Know Us</h4>
-          <a href="#">About BookWorld</a>
-          <a href="#">Careers</a>
-          <a href="#">Press Releases</a>
+          <router-link to="/about">About BookWorld</router-link>
         </div>
 
         <div class="footer-col">
           <h4>Customer Service</h4>
-          <a href="#">Help Center</a>
-          <a href="#">Returns & Refunds</a>
-          <a href="#">Shipping Info</a>
-          <a href="#">Order Tracking</a>
-        </div>
-
-        <div class="footer-col">
-          <h4>Categories</h4>
-          <a href="#">Fiction</a>
-          <a href="#">Science</a>
-          <a href="#">History</a>
-          <a href="#">Technology</a>
+          <router-link to="/help">Help Center</router-link>
+          <router-link to="/returns">Returns &amp; Refunds</router-link>
+          <router-link to="/shipping">Shipping Info</router-link>
+          <router-link to="/orders">Order Tracking</router-link>
         </div>
 
         <div class="footer-col">
           <h4>Connect With Us</h4>
-          <a href="#">Facebook</a>
-          <a href="#">Twitter</a>
-          <a href="#">Instagram</a>
-          <a href="#">Newsletter</a>
+          <a href="https://facebook.com" target="_blank" rel="noopener">Facebook</a>
+          <a href="https://twitter.com" target="_blank" rel="noopener">Twitter</a>
+          <a href="https://instagram.com" target="_blank" rel="noopener">Instagram</a>
+          <a href="mailto:bookworld.store.cs308@gmail.com">Email Us</a>
         </div>
       </div>
     </div>
@@ -56,6 +46,8 @@
 </template>
 
 <script setup>
+import { useRouter } from "vue-router";
+const router = useRouter();
 function scrollToTop() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -132,14 +124,16 @@ function scrollToTop() {
   margin: 0 0 6px 0;
 }
 
-.footer-col a {
+.footer-col a,
+.footer-col :deep(a) {
   color: #cbd5e1;
   text-decoration: none;
   font-size: 0.85rem;
   transition: color 0.2s;
 }
 
-.footer-col a:hover {
+.footer-col a:hover,
+.footer-col :deep(a:hover) {
   color: white;
   text-decoration: underline;
 }

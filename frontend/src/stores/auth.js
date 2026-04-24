@@ -1,23 +1,24 @@
 import { reactive, computed } from "vue";
-import { isValidEmail } from "../utils/validation.js";
+import api, { setToken, clearToken, getToken } from "../utils/api.js";
 
-const STORAGE_USERS = "bookworld_users";
 const STORAGE_SESSION = "bookworld_session";
 
 const state = reactive({
   user: null,
 });
 
-function readUsers() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_USERS) || "[]");
-  } catch {
-    return [];
+function loadSession() {
+  // Only restore session if there's also a JWT token (new system)
+  if (!getToken()) {
+    localStorage.removeItem(STORAGE_SESSION);
+    return;
   }
-}
-
-function writeUsers(users) {
-  localStorage.setItem(STORAGE_USERS, JSON.stringify(users));
+  try {
+    const raw = localStorage.getItem(STORAGE_SESSION);
+    if (raw) state.user = JSON.parse(raw);
+  } catch {
+    state.user = null;
+  }
 }
 
 function persistSession() {
@@ -28,58 +29,55 @@ function persistSession() {
   }
 }
 
-function loadSession() {
-  try {
-    const raw = localStorage.getItem(STORAGE_SESSION);
-    if (raw) state.user = JSON.parse(raw);
-  } catch {
-    state.user = null;
-  }
-}
-
 loadSession();
 
 const isLoggedIn = computed(() => !!state.user);
 
-function register({ email, password, name }) {
-  const e = String(email || "").trim().toLowerCase();
-  if (!isValidEmail(e)) return { ok: false, error: "Enter a valid email address." };
-  if (!password || String(password).length < 4) {
-    return { ok: false, error: "Password must be at least 4 characters." };
+async function register({ email, password, name }) {
+  try {
+    const { data } = await api.post("/auth/register", { name, email, password });
+    setToken(data.token);
+    state.user = data.user;
+    persistSession();
+    return { ok: true };
+  } catch (err) {
+    const msg = err.response?.data?.message || "Registration failed.";
+    return { ok: false, error: msg };
   }
-  const users = readUsers();
-  if (users.some((u) => u.email === e)) {
-    return { ok: false, error: "An account with this email already exists." };
-  }
-  const user = {
-    id: crypto.randomUUID(),
-    email: e,
-    name: String(name || "").trim() || e.split("@")[0],
-    password: String(password),
-  };
-  users.push(user);
-  writeUsers(users);
-  state.user = { id: user.id, email: user.email, name: user.name };
-  persistSession();
-  return { ok: true };
 }
 
-function login({ email, password }) {
-  const e = String(email || "").trim().toLowerCase();
-  const users = readUsers();
-  const match = users.find((u) => u.email === e && u.password === String(password));
-  if (!match) {
-    return { ok: false, error: "Invalid email or password." };
+async function login({ email, password }) {
+  try {
+    const { data } = await api.post("/auth/login", { email, password });
+    setToken(data.token);
+    state.user = data.user;
+    persistSession();
+    return { ok: true };
+  } catch (err) {
+    const msg = err.response?.data?.message || "Invalid email or password.";
+    return { ok: false, error: msg };
   }
-  state.user = { id: match.id, email: match.email, name: match.name };
-  persistSession();
-  return { ok: true };
 }
 
 function logout() {
+  clearToken();
   state.user = null;
   persistSession();
 }
+
+// Re-validate token on startup (silently ignore if expired)
+async function rehydrate() {
+  if (!getToken()) return;
+  try {
+    const { data } = await api.get("/auth/me");
+    state.user = { id: data._id, name: data.name, email: data.email, role: data.role };
+    persistSession();
+  } catch {
+    logout();
+  }
+}
+
+rehydrate();
 
 export function useAuthStore() {
   return {

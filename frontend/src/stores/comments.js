@@ -41,7 +41,6 @@ function submitReview({ productId, authorName, rating, text }) {
     status: "pending",
     createdAt: new Date().toISOString(),
   };
-  if (!review.text) return { ok: false, error: "Please enter a comment." };
   state.reviews.push(review);
   save();
   return { ok: true, review };

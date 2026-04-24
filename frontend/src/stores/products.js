@@ -1,0 +1,44 @@
+import { reactive } from "vue";
+import api from "../utils/api.js";
+
+const state = reactive({
+  products: [],
+  loading: false,
+  error: null,
+});
+
+// Map backend document → frontend shape (flattens category, adds id alias)
+function normalize(p) {
+  return {
+    ...p,
+    id: p._id,
+    category: p.category?.name ?? p.category ?? "",
+  };
+}
+
+async function fetchProducts() {
+  if (state.loading) return;
+  state.loading = true;
+  state.error = null;
+  try {
+    const { data } = await api.get("/products");
+    state.products.splice(0, state.products.length, ...data.map(normalize));
+  } catch (err) {
+    state.error = err.message;
+  } finally {
+    state.loading = false;
+  }
+}
+
+async function fetchProductById(id) {
+  try {
+    const { data } = await api.get(`/products/${id}`);
+    return normalize(data);
+  } catch {
+    return null;
+  }
+}
+
+export function useProductsStore() {
+  return { state, fetchProducts, fetchProductById };
+}

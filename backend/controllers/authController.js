@@ -35,8 +35,10 @@ exports.login = async (req, res) => {
       return res.status(400).json({ message: "email and password are required" });
 
     const user = await User.findOne({ email });
-    if (!user || !(await bcrypt.compare(password, user.password)))
-      return res.status(401).json({ message: "Invalid email or password" });
+    if (!user)
+      return res.status(401).json({ message: "No account found with this email. Please create an account." });
+    if (!(await bcrypt.compare(password, user.password)))
+      return res.status(401).json({ message: "Incorrect password. Please try again." });
 
     res.json({ token: signToken(user), user: { id: user._id, name: user.name, email: user.email, role: user.role } });
   } catch (err) {

@@ -1,89 +1,62 @@
 import { reactive } from "vue";
-import { nextDeliveryStatus } from "../utils/orderStatus.js";
-
-const STORAGE_ORDERS = "bookworld_orders";
+import api from "../utils/api.js";
+import { getToken } from "../utils/api.js";
 
 const state = reactive({
   orders: [],
 });
 
-function load() {
+async function fetchOrders() {
+  if (!getToken()) return;
   try {
-    state.orders = JSON.parse(localStorage.getItem(STORAGE_ORDERS) || "[]");
+    const { data } = await api.get("/orders");
+    state.orders.splice(0, state.orders.length, ...data);
   } catch {
     state.orders = [];
   }
 }
 
-function save() {
-  localStorage.setItem(STORAGE_ORDERS, JSON.stringify(state.orders));
-}
+async function createOrder(payload) {
+  const { items, subtotal, tax, total, paymentMethod, cardLast4, deliveryAddress } = payload;
 
-load();
+  // Map cart items → backend format (productId = MongoDB _id)
+  const backendItems = items.map((item) => ({
+    productId: item.id ?? item._id,
+    name: item.name,
+    price: item.price,
+    quantity: item.quantity,
+  }));
 
-function createOrder(payload) {
-  const {
-    userId,
-    items,
+  const { data } = await api.post("/orders", {
+    items: backendItems,
     subtotal,
     tax,
     total,
-    paymentMethod,
-    cardLast4,
-  } = payload;
-  if (!userId || !Array.isArray(items)) return null;
-
-  let itemsSnapshot;
-  try {
-    itemsSnapshot =
-      typeof structuredClone === "function"
-        ? structuredClone(items)
-        : JSON.parse(JSON.stringify(items));
-  } catch {
-    itemsSnapshot = JSON.parse(JSON.stringify(items));
-  }
-
-  const order = {
-    id: `ORD-${Date.now()}`,
-    userId,
-    items: itemsSnapshot,
-    subtotal,
-    tax,
-    total,
-    paymentMethod: paymentMethod || "mock_card",
+    paymentMethod: paymentMethod || "Mock Visa",
     cardLast4: cardLast4 || "****",
-    status: "processing",
-    createdAt: new Date().toISOString(),
-    invoiceNumber: `INV-${Date.now()}`,
-  };
-  state.orders.unshift(order);
-  save();
-  return order;
+    deliveryAddress: deliveryAddress || "",
+  });
+
+  state.orders.unshift(data);
+  return data;
 }
 
-function listByUserId(userId) {
-  if (!userId) return [];
-  return state.orders.filter((o) => o.userId === userId);
-}
-
-function getOrderById(orderId) {
-  return state.orders.find((o) => o.id === orderId) || null;
-}
-
-function advanceDemoStatus(orderId) {
-  const order = state.orders.find((o) => o.id === orderId);
-  if (!order) return null;
-  order.status = nextDeliveryStatus(order.status);
-  save();
-  return order.status;
+async function getOrderById(orderId) {
+  const cached = state.orders.find((o) => o._id === orderId || o.id === orderId);
+  if (cached) return cached;
+  try {
+    const { data } = await api.get(`/orders/${orderId}`);
+    return data;
+  } catch {
+    return null;
+  }
 }
 
 export function useOrdersStore() {
   return {
     state,
+    fetchOrders,
     createOrder,
-    listByUserId,
     getOrderById,
-    advanceDemoStatus,
   };
 }

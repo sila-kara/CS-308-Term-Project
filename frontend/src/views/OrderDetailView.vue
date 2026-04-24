@@ -4,7 +4,7 @@
       <button type="button" class="back" @click="router.push('/orders')">
         ← All orders
       </button>
-      <h1>{{ order.id }}</h1>
+      <h1>{{ order.invoiceNumber ?? order._id }}</h1>
       <p class="muted">Placed {{ formatDate(order.createdAt) }}</p>
     </div>
 
@@ -26,30 +26,32 @@
     <section class="panel">
       <h2>Shipment status</h2>
       <p class="status-pill">{{ label(order.status) }}</p>
-      <p class="demo-note">
-        Demo: status normally updates from the warehouse API. Use the button
-        below to simulate progress for your presentation.
-      </p>
-      <button
-        v-if="order.status !== 'delivered'"
-        type="button"
-        class="btn"
-        @click="advance"
-      >
-        Simulate next status
-      </button>
+      <template v-if="isAdmin">
+        <button
+          v-if="order.status !== 'delivered'"
+          type="button"
+          class="btn"
+          @click="advance"
+        >
+          Simulate next status
+        </button>
+      </template>
     </section>
 
     <section class="panel">
       <h2>Items</h2>
       <ul>
-        <li v-for="row in order.items" :key="row.id">
+        <li v-for="(row, i) in order.items" :key="i">
           <span>{{ row.name }}</span>
           <span>×{{ row.quantity }}</span>
           <span>{{ (row.price * row.quantity).toFixed(2) }} TL</span>
         </li>
       </ul>
     </section>
+  </div>
+
+  <div v-else-if="loading" class="missing">
+    <p>Loading order...</p>
   </div>
 
   <div v-else class="missing">
@@ -59,29 +61,33 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useAuthStore } from "../stores/auth";
 import { useOrdersStore } from "../stores/orders";
+import { useAuthStore } from "../stores/auth";
 import {
   ORDER_STATUS_SEQUENCE,
   statusLabel,
+  nextDeliveryStatus,
 } from "../utils/orderStatus";
+import api from "../utils/api.js";
 
 const route = useRoute();
 const router = useRouter();
+const { getOrderById } = useOrdersStore();
 const { state: authState } = useAuthStore();
-const { getOrderById, advanceDemoStatus } = useOrdersStore();
+const isAdmin = computed(() => authState.user?.role === "product_manager" || authState.user?.role === "admin");
 
-const order = computed(() => {
-  const id = route.params.id;
-  const found = getOrderById(id);
-  if (!found || found.userId !== authState.user?.id) return null;
-  return found;
+const order = ref(null);
+const loading = ref(true);
+
+onMounted(async () => {
+  order.value = await getOrderById(route.params.id);
+  loading.value = false;
 });
 
 const steps = computed(() => {
-  const current = order.value?.status;
+  const current = order.value?.status ?? "processing";
   const idx = ORDER_STATUS_SEQUENCE.indexOf(current);
   return [
     {
@@ -120,9 +126,16 @@ function label(s) {
   return statusLabel(s);
 }
 
-function advance() {
+async function advance() {
   if (!order.value) return;
-  advanceDemoStatus(order.value.id);
+  try {
+    // Tries backend (works for product_manager role)
+    const { data } = await api.patch(`/orders/${order.value._id}/status`);
+    order.value = data;
+  } catch {
+    // Demo fallback: advance locally so status timeline updates
+    order.value = { ...order.value, status: nextDeliveryStatus(order.value.status) };
+  }
 }
 </script>
 

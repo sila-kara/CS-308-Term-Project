@@ -9,6 +9,11 @@ import OrdersView from "../views/OrdersView.vue";
 import OrderDetailView from "../views/OrderDetailView.vue";
 import AdminReviewsView from "../views/AdminReviewsView.vue";
 import WishlistView from "../views/WishlistView.vue";
+import DealsView from "../views/DealsView.vue";
+import ShippingView from "../views/ShippingView.vue";
+import ReturnsView from "../views/ReturnsView.vue";
+import HelpView from "../views/HelpView.vue";
+import AboutView from "../views/AboutView.vue";
 import { useAuthStore } from "../stores/auth";
 
 const router = createRouter({
@@ -63,10 +68,19 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: "/deals",
+      name: "deals",
+      component: DealsView,
+    },
+    {
       path: "/admin/reviews",
       name: "admin-reviews",
       component: AdminReviewsView,
     },
+    { path: "/shipping", name: "shipping", component: ShippingView },
+    { path: "/returns", name: "returns", component: ReturnsView },
+    { path: "/help", name: "help", component: HelpView },
+    { path: "/about", name: "about", component: AboutView },
   ],
 });
 

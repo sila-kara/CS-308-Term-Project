@@ -256,8 +256,15 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { products, categories } from "../data/products.js";
+import { useProductsStore } from "../stores/products.js";
 import ProductCard from "../components/ProductCard.vue";
+
+const { state: productsState, fetchProducts } = useProductsStore();
+const products = productsState.products;
+const categories = computed(() => {
+  const cats = [...new Set(productsState.products.map((p) => p.category))].filter(Boolean).sort();
+  return ["All", ...cats];
+});
 
 const route = useRoute();
 const router = useRouter();
@@ -325,6 +332,7 @@ function resumeHeroAutoplay() {
 
 onMounted(() => {
   startHeroAutoplay();
+  fetchProducts();
 });
 
 onUnmounted(() => {
@@ -358,7 +366,7 @@ watch(
 );
 
 const categoriesWithoutAll = computed(() =>
-  categories.filter((c) => c !== "All"),
+  categories.value.filter((c) => c !== "All"),
 );
 
 const showBestsellers = computed(() => {
@@ -501,7 +509,23 @@ const filteredProducts = computed(() => {
 });
 
 const featuredBooks = computed(() => {
-  return [...products].sort((a, b) => b.ratingCount - a.ratingCount).slice(0, 5);
+  // Pick the top-rated book from each category for variety
+  const byCategory = {};
+  for (const p of products) {
+    const cat = p.category || "Other";
+    if (!byCategory[cat] || p.rating > byCategory[cat].rating) {
+      byCategory[cat] = p;
+    }
+  }
+  const picks = Object.values(byCategory).sort((a, b) => b.rating - a.rating).slice(0, 5);
+  if (picks.length < 5) {
+    const ids = new Set(picks.map(p => p.id));
+    const extras = [...products]
+      .filter(p => !ids.has(p.id))
+      .sort((a, b) => b.rating - a.rating);
+    picks.push(...extras.slice(0, 5 - picks.length));
+  }
+  return picks;
 });
 </script>
 

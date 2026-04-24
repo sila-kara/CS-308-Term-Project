@@ -191,9 +191,11 @@
 
 <script setup>
 import { computed, ref } from "vue";
-import { products } from "../data/products.js";
+import { useProductsStore } from "../stores/products.js";
 import { useCartStore } from "../stores/cart";
 import { computeCartTotal } from "../utils/cartMath";
+
+const { state: productsState } = useProductsStore();
 
 const GIFT_WRAP_FEE = 25;
 
@@ -212,7 +214,7 @@ const lineCount = computed(() => items.value.length);
 const cartIds = computed(() => new Set(items.value.map((i) => i.id)));
 
 const recommendedProducts = computed(() =>
-  products
+  productsState.products
     .filter((p) => !cartIds.value.has(p.id) && p.quantity > 0)
     .sort((a, b) => a.price - b.price)
     .slice(0, 24),

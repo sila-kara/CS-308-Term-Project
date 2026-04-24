@@ -40,7 +40,7 @@ exports.createOrder = async (req, res) => {
     try {
       const User = require("../models/User");
       const user = await User.findById(userId);
-      if (user) await sendInvoiceEmail(user.email, order);
+      if (user) await sendInvoiceEmail(user.email, order, user.name);
     } catch (emailErr) {
       console.error("Email error:", emailErr.message);
     }

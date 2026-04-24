@@ -154,9 +154,9 @@
 </template>
 
 <script setup>
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { categories } from "../data/products.js";
+import { useProductsStore } from "../stores/products.js";
 import { useCartStore } from "../stores/cart";
 import { useAuthStore } from "../stores/auth";
 import MiniCartDrawer from "./MiniCartDrawer.vue";
@@ -165,12 +165,15 @@ const router = useRouter();
 const route = useRoute();
 const { cartCount } = useCartStore();
 const { isLoggedIn, logout } = useAuthStore();
+const { state: productsState } = useProductsStore();
 
 const miniCartOpen = ref(false);
 
 const searchQuery = ref(route.query.search || "");
 
-const categoriesWithoutAll = categories.filter((c) => c !== "All");
+const categoriesWithoutAll = computed(() =>
+  [...new Set(productsState.products.map((p) => p.category))].filter(Boolean).sort()
+);
 
 watch(
   () => route.query.search,
@@ -203,10 +206,7 @@ function goToCategory(category) {
 }
 
 function goToDeals() {
-  router.push({
-    path: "/",
-    query: { sort: "price-desc" },
-  });
+  router.push("/deals");
 }
 
 function isActiveCategory(category) {

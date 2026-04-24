@@ -8,31 +8,31 @@
     <p v-if="rows.length === 0" class="empty">You have no orders yet.</p>
 
     <ul v-else class="list">
-      <li v-for="order in rows" :key="order.id">
+      <li v-for="order in rows" :key="order._id">
         <div>
-          <p class="id">{{ order.id }}</p>
+          <p class="id">{{ order.invoiceNumber ?? order._id }}</p>
           <p class="meta">{{ formatDate(order.createdAt) }}</p>
         </div>
         <div class="status" :data-status="order.status">
           {{ label(order.status) }}
         </div>
         <div class="total">{{ order.total.toFixed(2) }} TL</div>
-        <router-link class="link" :to="`/orders/${order.id}`">Details</router-link>
+        <router-link class="link" :to="`/orders/${order._id}`">Details</router-link>
       </li>
     </ul>
   </div>
 </template>
 
 <script setup>
-import { computed } from "vue";
-import { useAuthStore } from "../stores/auth";
+import { onMounted } from "vue";
 import { useOrdersStore } from "../stores/orders";
 import { statusLabel } from "../utils/orderStatus";
 
-const { state: authState } = useAuthStore();
-const { listByUserId } = useOrdersStore();
+const { state: ordersState, fetchOrders } = useOrdersStore();
 
-const rows = computed(() => listByUserId(authState.user?.id));
+const rows = ordersState.orders;
+
+onMounted(() => fetchOrders());
 
 function formatDate(iso) {
   try {

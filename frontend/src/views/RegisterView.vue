@@ -47,9 +47,9 @@ const email = ref("");
 const password = ref("");
 const error = ref("");
 
-function onSubmit() {
+async function onSubmit() {
   error.value = "";
-  const res = register({
+  const res = await register({
     name: name.value,
     email: email.value,
     password: password.value,

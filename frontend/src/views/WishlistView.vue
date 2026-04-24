@@ -1,12 +1,12 @@
 <template>
   <div class="wishlist-page">
     <h1>Wishlist</h1>
-    <p class="lead">Saved titles you love — available across the app.</p>
+    <p class="lead">Books you've saved for later.</p>
 
     <section class="wishlist-section" aria-label="Wishlisted products">
-      <div class="product-grid" v-if="wishlistProducts.length > 0">
+      <div class="product-grid" v-if="state.products.length > 0">
         <ProductCard
-          v-for="product in wishlistProducts"
+          v-for="product in state.products"
           :key="product.id"
           :product="product"
         />
@@ -23,17 +23,13 @@
 </template>
 
 <script setup>
-import { computed } from "vue";
-import { products } from "../data/products.js";
+import { onMounted } from "vue";
 import ProductCard from "../components/ProductCard.vue";
 import { useWishlistStore } from "../stores/wishlist";
 
-const { state } = useWishlistStore();
+const { state, loadWishlist } = useWishlistStore();
 
-const wishlistProducts = computed(() => {
-  const idSet = new Set(state.ids);
-  return products.filter((p) => idSet.has(p.id));
-});
+onMounted(() => loadWishlist());
 </script>
 
 <style scoped>

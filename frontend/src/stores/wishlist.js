@@ -1,94 +1,73 @@
 import { reactive } from "vue";
+import api from "../utils/api.js";
+import { getToken } from "../utils/api.js";
 
-const STORAGE_WISHLIST = "bookworld_wishlist_ids";
-
+// Products populated from backend (full objects with _id)
 const state = reactive({
-  ids: [],
+  products: [],
 });
 
-function readWishlistIds() {
+function normalize(p) {
+  return { ...p, id: p._id, category: p.category?.name ?? p.category ?? "" };
+}
+
+async function loadWishlist() {
+  if (!getToken()) {
+    state.products = [];
+    return;
+  }
   try {
-    const raw = localStorage.getItem(STORAGE_WISHLIST);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
+    const { data } = await api.get("/wishlist");
+    state.products = data.map(normalize);
   } catch {
-    return [];
+    state.products = [];
   }
 }
 
-function persistWishlistIds() {
+async function addToWishlist(productId) {
+  if (!getToken() || !productId) return;
   try {
-    localStorage.setItem(STORAGE_WISHLIST, JSON.stringify(state.ids));
+    await api.post(`/wishlist/${productId}`);
+    await loadWishlist();
   } catch {
-    // ignore storage failures (private mode, quota, etc.)
+    // already in wishlist or error — reload to sync
+    await loadWishlist();
   }
 }
 
-function normalizeId(id) {
-  const n = Number(id);
-  return Number.isFinite(n) ? n : id;
-}
-
-function normalizeIdList(list) {
-  if (!Array.isArray(list)) return [];
-  const seen = new Set();
-  const out = [];
-  for (const raw of list) {
-    const id = normalizeId(raw);
-    if (id == null) continue;
-    const key = `${typeof id}:${String(id)}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(id);
+async function removeFromWishlist(productId) {
+  if (!getToken() || !productId) return;
+  // Optimistic: remove locally first for snappy UI
+  state.products = state.products.filter(
+    (p) => p._id !== productId && p.id !== productId
+  );
+  try {
+    await api.delete(`/wishlist/${productId}`);
+  } catch {
+    await loadWishlist();
   }
-  return out;
-}
-
-function loadWishlist() {
-  if (typeof window === "undefined") return;
-  const next = normalizeIdList(readWishlistIds());
-  state.ids.splice(0, state.ids.length, ...next);
-}
-
-loadWishlist();
-
-function addToWishlist(productId) {
-  const id = normalizeId(productId);
-  if (id == null) return;
-  if (state.ids.includes(id)) return;
-  state.ids.push(id);
-  persistWishlistIds();
-}
-
-function removeFromWishlist(productId) {
-  const id = normalizeId(productId);
-  const idx = state.ids.indexOf(id);
-  if (idx === -1) return;
-  state.ids.splice(idx, 1);
-  persistWishlistIds();
 }
 
 function isInWishlist(productId) {
-  const id = normalizeId(productId);
-  return state.ids.includes(id);
+  const id = String(productId);
+  return state.products.some((p) => String(p._id) === id || String(p.id) === id);
 }
 
-function toggleWishlist(productId) {
-  const id = normalizeId(productId);
-  if (isInWishlist(id)) {
-    removeFromWishlist(id);
+async function toggleWishlist(productId) {
+  if (isInWishlist(productId)) {
+    await removeFromWishlist(productId);
   } else {
-    addToWishlist(id);
+    await addToWishlist(productId);
   }
 }
 
 export function useWishlistStore() {
   return {
     state,
+    loadWishlist,
     addToWishlist,
     removeFromWishlist,
     isInWishlist,
     toggleWishlist,
   };
 }
-

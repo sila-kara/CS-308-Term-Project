@@ -18,7 +18,10 @@
             required
           />
         </label>
-        <p v-if="error" class="error">{{ error }}</p>
+        <p v-if="error" class="error">
+          {{ error }}
+          <router-link v-if="error.includes('create an account')" to="/register"> Create an account →</router-link>
+        </p>
         <button class="btn primary" type="submit">Sign in</button>
       </form>
 
@@ -43,9 +46,9 @@ const email = ref("");
 const password = ref("");
 const error = ref("");
 
-function onSubmit() {
+async function onSubmit() {
   error.value = "";
-  const res = login({
+  const res = await login({
     email: email.value,
     password: password.value,
   });

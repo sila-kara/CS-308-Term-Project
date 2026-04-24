@@ -6,6 +6,7 @@
       <div class="success-card">
         <h2>Payment successful</h2>
         <p>Thank you. Your order is confirmed.</p>
+        <p class="email-note">A confirmation email with your invoice has been sent to your registered email address.</p>
       </div>
 
       <div class="invoice" v-if="lastOrder">
@@ -16,7 +17,7 @@
           </div>
           <div class="right">
             <p>{{ formatDate(lastOrder.createdAt) }}</p>
-            <p>Order {{ lastOrder.id }}</p>
+            <p>Order {{ lastOrder._id ?? lastOrder.id }}</p>
           </div>
         </header>
 
@@ -43,6 +44,10 @@
             <span>{{ lastOrder.subtotal.toFixed(2) }} TL</span>
           </div>
           <div class="row">
+            <span>Shipping</span>
+            <span>{{ (lastOrder.shipping ?? 0) === 0 ? 'Free' : (lastOrder.shipping ?? 0).toFixed(2) + ' TL' }}</span>
+          </div>
+          <div class="row">
             <span>Tax</span>
             <span>{{ lastOrder.tax.toFixed(2) }} TL</span>
           </div>
@@ -54,10 +59,13 @@
             Paid with {{ lastOrder.paymentMethod }} ending
             {{ lastOrder.cardLast4 }}
           </p>
+          <p v-if="lastOrder.deliveryAddress" class="pay-meta">
+            Delivery: {{ lastOrder.deliveryAddress }}
+          </p>
         </div>
 
         <div class="actions">
-          <router-link class="btn secondary" :to="`/orders/${lastOrder.id}`">
+          <router-link class="btn secondary" :to="`/orders/${lastOrder._id ?? lastOrder.id}`">
             Track shipment
           </router-link>
           <router-link class="btn primary" to="/">Continue shopping</router-link>
@@ -65,49 +73,104 @@
       </div>
     </div>
 
-    <div v-else class="grid">
-      <section class="panel">
-        <h2>Review items</h2>
-        <div v-if="items.length === 0" class="empty">
-          <p>Your cart is empty.</p>
-          <router-link to="/">Browse books</router-link>
-        </div>
-        <ul v-else class="mini-lines">
-          <li v-for="item in items" :key="item.id">
-            <span>{{ item.name }}</span>
-            <span>×{{ item.quantity }}</span>
-            <span>{{ (item.price * item.quantity).toFixed(2) }} TL</span>
-          </li>
-        </ul>
-      </section>
+    <div v-else class="checkout-layout">
+      <!-- Left column -->
+      <div class="left-col">
+        <section class="panel">
+          <h2>Order summary</h2>
+          <div v-if="items.length === 0" class="empty">
+            <p>Your cart is empty.</p>
+            <router-link to="/">Browse books</router-link>
+          </div>
+          <ul v-else class="mini-lines">
+            <li v-for="item in items" :key="item.id">
+              <span>{{ item.name }}</span>
+              <span>×{{ item.quantity }}</span>
+              <span>{{ (item.price * item.quantity).toFixed(2) }} TL</span>
+            </li>
+          </ul>
+          <div class="totals-box">
+            <div class="row">
+              <span>Subtotal</span>
+              <span>{{ subtotal.toFixed(2) }} TL</span>
+            </div>
+            <div class="row">
+              <span>Shipping</span>
+              <span>{{ shipping === 0 ? 'Free' : shipping.toFixed(2) + ' TL' }}</span>
+            </div>
+            <div class="row">
+              <span>Tax (10%)</span>
+              <span>{{ tax.toFixed(2) }} TL</span>
+            </div>
+            <div class="row strong">
+              <span>Total</span>
+              <span>{{ total.toFixed(2) }} TL</span>
+            </div>
+          </div>
+        </section>
 
-      <section class="panel pay">
-        <h2>Mock payment</h2>
-        <p class="muted">
-          For coursework only. No real card data is transmitted.
-        </p>
+        <section class="panel">
+          <h2>Delivery address</h2>
+          <div class="addr-form">
+            <label>
+              Full address
+              <textarea
+                v-model="deliveryAddress"
+                rows="3"
+                placeholder="Street no, neighbourhood, city, postal code"
+              />
+            </label>
+          </div>
+        </section>
+      </div>
+
+      <!-- Right column: payment -->
+      <section class="panel pay right-col">
+        <h2>Payment</h2>
+        <p class="muted">For coursework only. No real card data is transmitted.</p>
         <form @submit.prevent="submitPayment">
           <label>
-            Cardholder
-            <input v-model="cardName" required placeholder="Name on card" />
+            Cardholder name
+            <input
+              v-model="cardName"
+              required
+              placeholder="Name on card"
+              @input="cardName = cardName.replace(/[^a-zA-ZğüşıöçĞÜŞİÖÇ\s]/g, '')"
+            />
           </label>
           <label>
             Card number
             <input
-              v-model="cardNumber"
+              :value="cardNumber"
               required
               maxlength="19"
-              placeholder="4242 4242 4242 4242"
+              inputmode="numeric"
+              placeholder="1234 5678 9012 3456"
+              @input="onCardNumberInput"
             />
           </label>
           <div class="two">
             <label>
               Expiry
-              <input v-model="cardExpiry" required placeholder="MM/YY" />
+              <input
+                :value="cardExpiry"
+                required
+                maxlength="5"
+                inputmode="numeric"
+                placeholder="MM/YY"
+                @input="onExpiryInput"
+              />
             </label>
             <label>
               CVC
-              <input v-model="cardCvc" required maxlength="4" placeholder="123" />
+              <input
+                :value="cardCvc"
+                required
+                maxlength="4"
+                inputmode="numeric"
+                placeholder="123"
+                @input="onCvcInput"
+              />
             </label>
           </div>
           <p v-if="payError" class="error">{{ payError }}</p>
@@ -115,21 +178,6 @@
             Pay {{ total.toFixed(2) }} TL
           </button>
         </form>
-
-        <div class="totals-box">
-          <div class="row">
-            <span>Subtotal</span>
-            <span>{{ subtotal.toFixed(2) }} TL</span>
-          </div>
-          <div class="row">
-            <span>Tax (10%)</span>
-            <span>{{ tax.toFixed(2) }} TL</span>
-          </div>
-          <div class="row strong">
-            <span>Total</span>
-            <span>{{ total.toFixed(2) }} TL</span>
-          </div>
-        </div>
       </section>
     </div>
   </div>
@@ -142,7 +190,6 @@ import { useAuthStore } from "../stores/auth";
 import { useCartStore } from "../stores/cart";
 import { useOrdersStore } from "../stores/orders";
 import { computeCartTotal } from "../utils/cartMath";
-import { decrementStock } from "../data/products.js";
 
 const router = useRouter();
 const { state: authState } = useAuthStore();
@@ -157,11 +204,52 @@ const cardName = ref("");
 const cardNumber = ref("");
 const cardExpiry = ref("");
 const cardCvc = ref("");
+const deliveryAddress = ref("");
+
+const SHIPPING_FEE = 29.99;
+const FREE_SHIPPING_THRESHOLD = 250;
 
 const items = computed(() => cartState.items);
 const subtotal = computed(() => computeCartTotal(items.value));
+const shipping = computed(() => subtotal.value >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE);
 const tax = computed(() => Math.round(subtotal.value * 0.1 * 100) / 100);
-const total = computed(() => subtotal.value + tax.value);
+const total = computed(() => subtotal.value + tax.value + shipping.value);
+
+// Card input formatters
+function onCardNumberInput(e) {
+  const digits = e.target.value.replace(/\D/g, "").slice(0, 16);
+  cardNumber.value = digits.replace(/(.{4})/g, "$1 ").trim();
+  e.target.value = cardNumber.value;
+}
+
+function onExpiryInput(e) {
+  let digits = e.target.value.replace(/\D/g, "").slice(0, 4);
+  if (digits.length >= 3) digits = digits.slice(0, 2) + "/" + digits.slice(2);
+  cardExpiry.value = digits;
+  e.target.value = cardExpiry.value;
+}
+
+function onCvcInput(e) {
+  const digits = e.target.value.replace(/\D/g, "").slice(0, 4);
+  cardCvc.value = digits;
+  e.target.value = cardCvc.value;
+}
+
+function validateCard() {
+  const digits = cardNumber.value.replace(/\s/g, "");
+  if (digits.length !== 16) return "Card number must be 16 digits.";
+  const [mm, yy] = cardExpiry.value.split("/");
+  if (!mm || !yy || mm.length !== 2 || yy.length !== 2) return "Expiry must be MM/YY.";
+  const month = Number(mm);
+  if (month < 1 || month > 12) return "Invalid expiry month.";
+  const now = new Date();
+  const expYear = 2000 + Number(yy);
+  const expMonth = month;
+  if (expYear < now.getFullYear() || (expYear === now.getFullYear() && expMonth < now.getMonth() + 1))
+    return "Card has expired.";
+  if (cardCvc.value.length < 3) return "CVC must be 3–4 digits.";
+  return null;
+}
 
 function last4(num) {
   const digits = String(num || "").replace(/\D/g, "");
@@ -177,7 +265,7 @@ function formatDate(iso) {
   }
 }
 
-function submitPayment() {
+async function submitPayment() {
   payError.value = "";
   if (!authState.user) {
     router.push({ path: "/login", query: { redirect: "/checkout" } });
@@ -187,25 +275,28 @@ function submitPayment() {
     payError.value = "Cart is empty.";
     return;
   }
-  const order = createOrder({
-    userId: authState.user.id,
-    items: items.value,
-    subtotal: subtotal.value,
-    tax: tax.value,
-    total: total.value,
-    paymentMethod: "Mock Visa",
-    cardLast4: last4(cardNumber.value),
-  });
-  if (!order) {
-    payError.value = "Could not create order.";
+  const cardError = validateCard();
+  if (cardError) {
+    payError.value = cardError;
     return;
   }
-  // Decrement stock for each purchased item (Story 12)
-  items.value.forEach((item) => decrementStock(item.id, item.quantity));
-
-  lastOrder.value = order;
-  clearCart();
-  step.value = "success";
+  try {
+    const order = await createOrder({
+      items: items.value,
+      subtotal: subtotal.value,
+      shipping: shipping.value,
+      tax: tax.value,
+      total: total.value,
+      paymentMethod: "Mock Visa",
+      cardLast4: last4(cardNumber.value),
+      deliveryAddress: deliveryAddress.value,
+    });
+    lastOrder.value = order;
+    clearCart();
+    step.value = "success";
+  } catch (err) {
+    payError.value = err.response?.data?.message || "Could not place order. Please try again.";
+  }
 }
 </script>
 
@@ -222,11 +313,21 @@ h1 {
   color: #0f172a;
 }
 
-.grid {
+.checkout-layout {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
   align-items: start;
+}
+
+.left-col {
+  display: grid;
+  gap: 16px;
+}
+
+.right-col {
+  position: sticky;
+  top: 90px;
 }
 
 .panel {
@@ -277,10 +378,13 @@ label {
   color: #334155;
 }
 
-input {
+input,
+textarea {
   padding: 10px 11px;
   border-radius: 10px;
   border: 1px solid #cfdbea;
+  font: inherit;
+  resize: vertical;
 }
 
 .two {
@@ -349,6 +453,12 @@ input {
   border: 1px solid #a7f3d0;
   border-radius: 8px;
   padding: 16px;
+}
+
+.email-note {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: #065f46;
 }
 
 .invoice {
@@ -423,9 +533,18 @@ td {
   color: #64748b;
 }
 
+.addr-form {
+  display: grid;
+  gap: 10px;
+}
+
 @media (max-width: 880px) {
-  .grid {
+  .checkout-layout {
     grid-template-columns: 1fr;
+  }
+
+  .right-col {
+    position: static;
   }
 }
 </style>

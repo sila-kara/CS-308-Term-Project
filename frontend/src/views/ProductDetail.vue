@@ -125,9 +125,9 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { products } from "../data/products.js";
+import { useProductsStore } from "../stores/products.js";
 import { useCartStore } from "../stores/cart";
 import { useAuthStore } from "../stores/auth";
 import { useCommentsStore } from "../stores/comments";
@@ -138,10 +138,12 @@ const { addToCart } = useCartStore();
 const { isLoggedIn, state: authState } = useAuthStore();
 const { listApprovedForProduct, submitReview: postReview } =
   useCommentsStore();
+const { fetchProductById } = useProductsStore();
 
-const product = computed(() => {
-  const id = Number(route.params.id);
-  return products.find((p) => p.id === id);
+const product = ref(null);
+
+onMounted(async () => {
+  product.value = await fetchProductById(route.params.id);
 });
 
 const approvedReviews = computed(() =>
@@ -155,12 +157,13 @@ const reviewSuccess = ref("");
 const cartMessage = ref("");
 
 watch(
-  () => product.value?.id,
-  () => {
+  () => route.params.id,
+  async (id) => {
     reviewError.value = "";
     reviewSuccess.value = "";
     draftText.value = "";
     draftRating.value = 5;
+    product.value = await fetchProductById(id);
   },
 );
 
