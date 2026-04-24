@@ -139,10 +139,14 @@
 import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useCartStore } from "../stores/cart";
+import { useAuthStore } from "../stores/auth";
+import { useOrdersStore } from "../stores/orders";
 import { computeCartTotal } from "../utils/cartMath";
 
 const router = useRouter();
 const { state: cartState, clearCart } = useCartStore();
+const { state: authState, isLoggedIn } = useAuthStore();
+const { createOrder } = useOrdersStore();
 
 const step = ref("pay");
 const lastOrder = ref(null);
@@ -176,8 +180,7 @@ function formatDate(iso) {
 async function submitPayment() {
   payError.value = "";
 
-  const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
-  if (!isLoggedIn) {
+  if (!isLoggedIn.value) {
     router.push({ path: "/login", query: { redirect: "/checkout" } });
     return;
   }
@@ -189,31 +192,28 @@ async function submitPayment() {
 
   try {
     isPaying.value = true;
-    await new Promise((resolve) => setTimeout(resolve, 1000));
 
-    const now = new Date();
-    const mockId = `MOCK-${now.getTime()}`;
-    lastOrder.value = {
-      id: mockId,
-      invoiceNumber: `INV-${now.getFullYear()}-${String(now.getTime()).slice(-6)}`,
-      createdAt: now.toISOString(),
-      items: items.value.map((item) => ({
-        id: item.id,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity,
-      })),
+    const order = await createOrder({
+      items: items.value,
       subtotal: subtotal.value,
       tax: tax.value,
       total: total.value,
       paymentMethod: "Mock Visa",
       cardLast4: last4(cardNumber.value),
-    };
+      deliveryAddress: authState.user?.address || "",
+    });
+
+    if (!order) {
+      payError.value = "Could not create order.";
+      return;
+    }
+
+    lastOrder.value = order;
     clearCart();
     step.value = "success";
   } catch (err) {
     console.error(err);
-    payError.value = "Could not complete payment.";
+    payError.value = err.response?.data?.message || "Could not complete payment.";
   } finally {
     isPaying.value = false;
   }

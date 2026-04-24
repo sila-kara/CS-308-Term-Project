@@ -1,89 +1,57 @@
 import { reactive } from "vue";
-import { nextDeliveryStatus } from "../utils/orderStatus.js";
+import axios from "axios";
 
-const STORAGE_ORDERS = "bookworld_orders";
+const API = "http://localhost:5050/api/orders";
 
 const state = reactive({
   orders: [],
 });
 
-function load() {
-  try {
-    state.orders = JSON.parse(localStorage.getItem(STORAGE_ORDERS) || "[]");
-  } catch {
-    state.orders = [];
-  }
-}
+async function createOrder(payload) {
+  const { items, subtotal, tax, total, paymentMethod, cardLast4, deliveryAddress } = payload;
+  if (!Array.isArray(items) || items.length === 0) return null;
 
-function save() {
-  localStorage.setItem(STORAGE_ORDERS, JSON.stringify(state.orders));
-}
-
-load();
-
-function createOrder(payload) {
-  const {
-    userId,
-    items,
+  const body = {
+    items: items.map((i) => ({
+      productId: i.id,
+      name: i.name,
+      price: i.price,
+      quantity: i.quantity,
+    })),
     subtotal,
     tax,
     total,
-    paymentMethod,
-    cardLast4,
-  } = payload;
-  if (!userId || !Array.isArray(items)) return null;
-
-  let itemsSnapshot;
-  try {
-    itemsSnapshot =
-      typeof structuredClone === "function"
-        ? structuredClone(items)
-        : JSON.parse(JSON.stringify(items));
-  } catch {
-    itemsSnapshot = JSON.parse(JSON.stringify(items));
-  }
-
-  const order = {
-    id: `ORD-${Date.now()}`,
-    userId,
-    items: itemsSnapshot,
-    subtotal,
-    tax,
-    total,
-    paymentMethod: paymentMethod || "mock_card",
+    paymentMethod: paymentMethod || "Mock Visa",
     cardLast4: cardLast4 || "****",
-    status: "processing",
-    createdAt: new Date().toISOString(),
-    invoiceNumber: `INV-${Date.now()}`,
+    deliveryAddress: deliveryAddress || "",
   };
+
+  const res = await axios.post(API, body);
+  const order = { ...res.data, id: res.data._id || res.data.id };
   state.orders.unshift(order);
-  save();
   return order;
 }
 
-function listByUserId(userId) {
-  if (!userId) return [];
-  return state.orders.filter((o) => o.userId === userId);
+async function fetchOrders() {
+  const res = await axios.get(API);
+  state.orders = (res.data || []).map((o) => ({ ...o, id: o._id || o.id }));
+}
+
+async function fetchOrderById(orderId) {
+  const res = await axios.get(`${API}/${orderId}`);
+  return { ...res.data, id: res.data._id || res.data.id };
 }
 
 function getOrderById(orderId) {
-  return state.orders.find((o) => o.id === orderId) || null;
-}
-
-function advanceDemoStatus(orderId) {
-  const order = state.orders.find((o) => o.id === orderId);
-  if (!order) return null;
-  order.status = nextDeliveryStatus(order.status);
-  save();
-  return order.status;
+  return state.orders.find((o) => o.id === orderId || o._id === orderId) || null;
 }
 
 export function useOrdersStore() {
   return {
     state,
     createOrder,
-    listByUserId,
+    fetchOrders,
+    fetchOrderById,
     getOrderById,
-    advanceDemoStatus,
   };
 }

@@ -336,13 +336,19 @@ async function fetchProducts() {
   productsError.value = "";
 
   try {
-    const res = await axios.get("http://localhost:5050/api/products");
+    const params = {};
+    if (localSearch.value.trim()) params.search = localSearch.value.trim();
+    if (selectedCategory.value !== "All") params.category = selectedCategory.value;
+    const sortMap = { "price-asc": "price-asc", "price-desc": "price-desc", "rating": "popularity" };
+    if (sortMap[sortBy.value]) params.sort = sortMap[sortBy.value];
+
+    const res = await axios.get("http://localhost:5050/api/products", { params });
 
     products.value = (res.data || []).map((product, index) => ({
       ...product,
       id: product._id || product.id || index + 1,
       image: product.image || "https://via.placeholder.com/300x420?text=Book",
-      category: product.category || "Uncategorized",
+      category: product.category?.name || product.category || "Uncategorized",
       distributor: product.distributor || "Unknown",
       author: product.author || "Unknown author",
       serialNumber: product.serialNumber || "",
@@ -359,6 +365,10 @@ async function fetchProducts() {
     loadingProducts.value = false;
   }
 }
+
+watch([localSearch, selectedCategory, sortBy], () => {
+  fetchProducts();
+});
 
 onMounted(() => {
   startHeroAutoplay();
