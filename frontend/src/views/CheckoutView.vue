@@ -112,7 +112,16 @@
         <section class="panel">
           <h2>Delivery address</h2>
           <div class="addr-form">
-            <label>
+            <label v-if="savedAddress" class="saved-addr-toggle">
+              <input
+                type="checkbox"
+                v-model="useSavedAddress"
+                @change="onUseSavedToggle"
+              />
+              Use my saved address
+            </label>
+            <p v-if="savedAddress && useSavedAddress" class="saved-addr-preview">{{ savedAddress }}</p>
+            <label v-if="!useSavedAddress || !savedAddress">
               Full address
               <textarea
                 v-model="deliveryAddress"
@@ -184,12 +193,13 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "../stores/auth";
 import { useCartStore } from "../stores/cart";
 import { useOrdersStore } from "../stores/orders";
 import { computeCartTotal } from "../utils/cartMath";
+import api from "../utils/api.js";
 
 const router = useRouter();
 const { state: authState } = useAuthStore();
@@ -205,6 +215,27 @@ const cardNumber = ref("");
 const cardExpiry = ref("");
 const cardCvc = ref("");
 const deliveryAddress = ref("");
+const savedAddress = ref("");
+const useSavedAddress = ref(false);
+
+onMounted(async () => {
+  try {
+    const { data } = await api.get("/auth/me");
+    if (data.address) {
+      savedAddress.value = data.address;
+      useSavedAddress.value = true;
+      deliveryAddress.value = data.address;
+    }
+  } catch {}
+});
+
+function onUseSavedToggle() {
+  if (useSavedAddress.value) {
+    deliveryAddress.value = savedAddress.value;
+  } else {
+    deliveryAddress.value = "";
+  }
+}
 
 const SHIPPING_FEE = 29.99;
 const FREE_SHIPPING_THRESHOLD = 250;
@@ -536,6 +567,27 @@ td {
 .addr-form {
   display: grid;
   gap: 10px;
+}
+
+.saved-addr-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1e40af;
+  cursor: pointer;
+}
+
+.saved-addr-preview {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  color: #1e3a8a;
+  margin: 0;
+  white-space: pre-wrap;
 }
 
 @media (max-width: 880px) {

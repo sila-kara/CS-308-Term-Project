@@ -56,34 +56,27 @@
             </router-link>
           </template>
           <template v-else>
-            <router-link class="nav-icon-link" to="/orders">
-              <span class="nav-icon-wrap" aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
-                  <path
-                    stroke="currentColor"
-                    stroke-width="1.75"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z"
-                  />
-                </svg>
-              </span>
-              <span class="nav-label">My account</span>
-            </router-link>
-            <button type="button" class="nav-icon-link is-btn" @click="logout">
-              <span class="nav-icon-wrap" aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
-                  <path
-                    stroke="currentColor"
-                    stroke-width="1.75"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"
-                  />
-                </svg>
-              </span>
-              <span class="nav-label">Sign out</span>
-            </button>
+            <div class="account-menu" @mouseenter="accountOpen = true" @mouseleave="accountOpen = false">
+              <button type="button" class="nav-icon-link is-btn">
+                <span class="nav-icon-wrap" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+                    <path stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"
+                      d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z" />
+                  </svg>
+                </span>
+                <span class="nav-label">My account</span>
+              </button>
+              <div class="account-dropdown">
+                <div class="account-dropdown-inner">
+                  <router-link to="/profile" class="drop-item">⚙️ Settings</router-link>
+                  <router-link to="/orders" class="drop-item">📦 My Orders</router-link>
+                  <router-link to="/wishlist" class="drop-item">❤️ Wishlist</router-link>
+                  <router-link to="/returns" class="drop-item">↩️ Returns</router-link>
+                  <div class="drop-divider" />
+                  <button type="button" class="drop-item drop-signout" @click="handleLogout">🚪 Sign out</button>
+                </div>
+              </div>
+            </div>
           </template>
 
           <router-link class="nav-icon-link" to="/wishlist">
@@ -165,6 +158,8 @@ const router = useRouter();
 const route = useRoute();
 const { cartCount } = useCartStore();
 const { isLoggedIn, logout } = useAuthStore();
+const accountOpen = ref(false);
+function handleLogout() { logout(); router.push("/login"); }
 const { state: productsState } = useProductsStore();
 
 const miniCartOpen = ref(false);
@@ -394,6 +389,57 @@ function isActiveCategory(category) {
 .nav-icon-link.is-btn {
   padding-top: 4px;
 }
+
+.account-menu {
+  position: relative;
+}
+
+.account-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  padding-top: 8px;
+  background: transparent;
+  z-index: 200;
+  min-width: 180px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.account-menu:hover .account-dropdown,
+.account-dropdown:hover {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+.account-dropdown-inner {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(15,23,42,0.12);
+  padding: 6px;
+  display: grid;
+  gap: 2px;
+}
+
+.drop-item {
+  display: block;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: #334155;
+  text-decoration: none;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+}
+.drop-item:hover { background: #f1f5f9; }
+.drop-divider { height: 1px; background: #e2e8f0; margin: 4px 0; }
+.drop-signout { color: #dc2626; font-weight: 600; }
 
 .nav-icon-wrap {
   display: grid;

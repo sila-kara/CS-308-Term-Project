@@ -1,16 +1,35 @@
 <template>
   <div class="app">
-    <Navbar />
+    <AdminNav v-if="isAdminRoute" />
+    <template v-else>
+      <Navbar />
+    </template>
     <main class="main-content">
       <router-view />
     </main>
-    <Footer />
+    <Footer v-if="!isAdminRoute" />
   </div>
 </template>
 
 <script setup>
+import { computed, watch } from "vue";
+import { useRoute } from "vue-router";
 import Navbar from "./components/Navbar.vue";
+import AdminNav from "./components/AdminNav.vue";
 import Footer from "./components/Footer.vue";
+import { useWishlistStore } from "./stores/wishlist";
+import { useAuthStore } from "./stores/auth";
+
+const route = useRoute();
+const isAdminRoute = computed(() => route.path.startsWith("/admin"));
+
+const { loadWishlist } = useWishlistStore();
+const { state: authState } = useAuthStore();
+
+watch(() => authState.user, (user) => {
+  if (user) loadWishlist();
+  else loadWishlist(); // clears when logged out
+}, { immediate: true });
 </script>
 
 <style>

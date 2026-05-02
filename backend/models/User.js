@@ -12,6 +12,9 @@ const userSchema = new mongoose.Schema({
   taxId: { type: String, default: "" },
   address: { type: String, default: "" },
   wishlist: [{ type: mongoose.Schema.Types.ObjectId, ref: "Product", default: [] }],
+  avatar: { type: String, default: null },
+  resetToken: { type: String, default: null },
+  resetTokenExpiry: { type: Date, default: null },
 }, { timestamps: true });
 
 module.exports = mongoose.model("User", userSchema);

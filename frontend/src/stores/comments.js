@@ -1,71 +1,77 @@
 import { reactive } from "vue";
-
-const STORAGE = "bookworld_reviews";
+import api from "../utils/api.js";
 
 const state = reactive({
-  reviews: [],
+  reviews: [],          // approved reviews per product (keyed by productId)
+  pending: [],          // pending reviews for admin
 });
 
-function load() {
+async function fetchApprovedForProduct(productId) {
   try {
-    state.reviews = JSON.parse(localStorage.getItem(STORAGE) || "[]");
+    const { data } = await api.get(`/comments/${productId}`);
+    state.reviews = data;
   } catch {
     state.reviews = [];
   }
 }
 
-function save() {
-  localStorage.setItem(STORAGE, JSON.stringify(state.reviews));
+function listApprovedForProduct(productId) {
+  return state.reviews.filter(r => String(r.productId) === String(productId));
 }
 
-load();
-
-function listApprovedForProduct(productId) {
-  const id = Number(productId);
-  return state.reviews.filter(
-    (r) => r.productId === id && r.status === "approved",
-  );
+async function fetchPending() {
+  try {
+    const { data } = await api.get("/comments/pending");
+    state.pending = data;
+  } catch {
+    state.pending = [];
+  }
 }
 
 function listPending() {
-  return state.reviews.filter((r) => r.status === "pending");
+  return state.pending;
 }
 
-function submitReview({ productId, authorName, rating, text }) {
-  const review = {
-    id: crypto.randomUUID(),
-    productId: Number(productId),
-    authorName: String(authorName || "Reader").trim(),
-    rating: Math.min(5, Math.max(1, Number(rating) || 5)),
-    text: String(text || "").trim(),
-    status: "pending",
-    createdAt: new Date().toISOString(),
-  };
-  state.reviews.push(review);
-  save();
-  return { ok: true, review };
+async function submitReview({ productId, userId, rating, text }) {
+  try {
+    await api.post("/comments", {
+      userId,
+      productId,
+      rating,
+      commentText: text || "",
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.response?.data?.message || "Failed to submit review." };
+  }
 }
 
-function approveReview(reviewId) {
-  const r = state.reviews.find((x) => x.id === reviewId);
-  if (!r) return false;
-  r.status = "approved";
-  save();
-  return true;
+async function approveReview(commentId) {
+  try {
+    await api.patch(`/comments/approve/${commentId}`);
+    state.pending = state.pending.filter(r => r._id !== commentId);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
-function rejectReview(reviewId) {
-  const idx = state.reviews.findIndex((x) => x.id === reviewId);
-  if (idx === -1) return false;
-  state.reviews.splice(idx, 1);
-  save();
-  return true;
+async function rejectReview(commentId) {
+  try {
+    await api.patch(`/comments/reject/${commentId}`);
+    state.pending = state.pending.filter(r => r._id !== commentId);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function useCommentsStore() {
   return {
     state,
+    fetchApprovedForProduct,
     listApprovedForProduct,
+    fetchPending,
     listPending,
     submitReview,
     approveReview,

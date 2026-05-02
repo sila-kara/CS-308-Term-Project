@@ -15,11 +15,18 @@ function authMiddleware(req, res, next) {
 }
 
 function requireRole(...roles) {
-  return (req, res, next) => {
-    if (!roles.includes(req.user?.role)) {
-      return res.status(403).json({ message: "Forbidden" });
+  return async (req, res, next) => {
+    try {
+      const User = require("../models/User");
+      const user = await User.findById(req.user?.id).select("role");
+      if (!user || !roles.includes(user.role)) {
+        return res.status(403).json({ message: "Forbidden" });
+      }
+      req.user.role = user.role; // keep in sync
+      next();
+    } catch {
+      return res.status(500).json({ message: "Auth error" });
     }
-    next();
   };
 }
 

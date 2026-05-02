@@ -8,12 +8,16 @@ import RegisterView from "../views/RegisterView.vue";
 import OrdersView from "../views/OrdersView.vue";
 import OrderDetailView from "../views/OrderDetailView.vue";
 import AdminReviewsView from "../views/AdminReviewsView.vue";
+import AdminOrdersView from "../views/AdminOrdersView.vue";
 import WishlistView from "../views/WishlistView.vue";
 import DealsView from "../views/DealsView.vue";
 import ShippingView from "../views/ShippingView.vue";
 import ReturnsView from "../views/ReturnsView.vue";
 import HelpView from "../views/HelpView.vue";
 import AboutView from "../views/AboutView.vue";
+import ForgotPasswordView from "../views/ForgotPasswordView.vue";
+import ResetPasswordView from "../views/ResetPasswordView.vue";
+import ProfileView from "../views/ProfileView.vue";
 import { useAuthStore } from "../stores/auth";
 
 const router = createRouter({
@@ -77,10 +81,19 @@ const router = createRouter({
       name: "admin-reviews",
       component: AdminReviewsView,
     },
+    {
+      path: "/admin/orders",
+      name: "admin-orders",
+      component: AdminOrdersView,
+      meta: { requiresAuth: true },
+    },
     { path: "/shipping", name: "shipping", component: ShippingView },
     { path: "/returns", name: "returns", component: ReturnsView },
     { path: "/help", name: "help", component: HelpView },
     { path: "/about", name: "about", component: AboutView },
+    { path: "/profile", name: "profile", component: ProfileView, meta: { requiresAuth: true } },
+    { path: "/forgot-password", name: "forgot-password", component: ForgotPasswordView },
+    { path: "/reset-password", name: "reset-password", component: ResetPasswordView },
   ],
 });
 

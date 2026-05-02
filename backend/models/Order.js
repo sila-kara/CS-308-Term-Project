@@ -18,10 +18,18 @@ const orderSchema = new mongoose.Schema({
   deliveryAddress: { type: String, default: "" },
   status: {
     type: String,
-    enum: ["processing", "in-transit", "delivered"],
+    enum: ["processing", "in-transit", "delivered", "cancelled"],
     default: "processing",
   },
   invoiceNumber: { type: String },
+  shipping: { type: Number, default: 0 },
+  returnStatus: { type: String, enum: [null, "requested", "approved", "rejected", "refunded"], default: null },
+  returnRejectionReason: { type: String, default: "" },
+  returnCargoCode: { type: String, default: null },
+  returnCargoCompany: { type: String, default: null },
+  returnItems: [{ type: String }],
+  returnReason: { type: String, default: "" },
+  returnRequestedAt: { type: Date, default: null },
 }, { timestamps: true });
 
 // Auto-generate invoice number before saving
