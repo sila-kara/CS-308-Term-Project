@@ -259,6 +259,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useProductsStore } from "../stores/products.js";
 import ProductCard from "../components/ProductCard.vue";
+import { isOnSale } from "../utils/productUtils";
 
 const { state: productsState, fetchProducts } = useProductsStore();
 const products = productsState.products;
@@ -466,10 +467,6 @@ const heroSlides = computed(() => [
   },
 ]);
 
-function isOnSale(p) {
-  const id = String(p?._id || p?.id || "");
-  return !"39f".includes(id.slice(-1));
-}
 
 const filteredProducts = computed(() => {
   let result = [...products];

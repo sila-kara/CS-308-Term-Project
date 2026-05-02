@@ -29,6 +29,7 @@ const orderSchema = new mongoose.Schema({
   returnCargoCompany: { type: String, default: null },
   returnItems: [{ type: String }],
   returnReason: { type: String, default: "" },
+  returnPhoto: { type: String, default: null },
   returnRequestedAt: { type: Date, default: null },
 }, { timestamps: true });
 

@@ -40,3 +40,12 @@ export function searchProducts(products, query) {
       p.description?.toLowerCase().includes(lower)
   );
 }
+
+export function isOnSale(product) {
+  const id = String(product?._id || product?.id || "");
+  return !"39f".includes(id.slice(-1));
+}
+
+export function isTopRated(product) {
+  return (product?.rating ?? 0) >= 4.8 && (product?.ratingCount ?? 0) >= 50;
+}

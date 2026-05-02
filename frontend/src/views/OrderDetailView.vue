@@ -167,6 +167,7 @@ async function submitReturn() {
     const { data } = await api.post(`/orders/${order.value._id}/return`, {
       returnItems: returnItems.value,
       returnReason: returnReason.value.trim(),
+      returnPhoto: photoPreview.value || null,
     });
     order.value = data;
   } catch (e) {

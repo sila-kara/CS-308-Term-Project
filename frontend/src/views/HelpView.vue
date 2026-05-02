@@ -56,7 +56,7 @@ const faqs = [
   },
   {
     q: "I forgot my password. What should I do?",
-    a: "Currently, password reset is not available through the website. Please email us at bookworld.store.cs308@gmail.com and we'll assist you manually."
+    a: "You can reset your password directly on the website. Click \"Forgot password?\" on the login page, enter your email address, and we'll send you a reset link. The link expires in 1 hour."
   },
   {
     q: "Are bundle discounts applied automatically?",

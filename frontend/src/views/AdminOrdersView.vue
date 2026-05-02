@@ -47,6 +47,7 @@
             <span>📦 <strong>{{ order.returnCargoCompany }}</strong> — <code>{{ order.returnCargoCode }}</code></span>
             <span v-if="order.returnItems?.length" class="return-items">Items: {{ order.returnItems.join(", ") }}</span>
             <span v-if="order.returnReason" class="return-reason">Reason: {{ order.returnReason }}</span>
+            <img v-if="order.returnPhoto" :src="order.returnPhoto" class="return-photo" alt="Return photo" />
           </div>
 
           <!-- Pending: approve / reject -->
@@ -68,14 +69,15 @@
         <!-- Actions -->
         <div class="actions">
           <button
-            v-if="order.status !== 'delivered'"
+            v-if="order.status !== 'delivered' && order.status !== 'cancelled'"
             class="btn advance"
             :disabled="advancing[order._id]"
             @click="advance(order)"
           >
             {{ advancing[order._id] ? "Updating…" : `→ ${nextStatus(order.status)}` }}
           </button>
-          <span v-else class="delivered-tag">✅ Delivered</span>
+          <span v-else-if="order.status === 'delivered'" class="delivered-tag">✅ Delivered</span>
+          <span v-else-if="order.status === 'cancelled'" class="cancelled-tag">🚫 Cancelled</span>
         </div>
       </div>
     </template>
@@ -102,6 +104,7 @@ const tabs = [
   { label: "Processing", value: "processing" },
   { label: "In Transit", value: "in-transit" },
   { label: "Delivered", value: "delivered" },
+  { label: "Cancelled", value: "cancelled" },
   { label: "Return Requests", value: "returns" },
 ];
 
@@ -231,6 +234,7 @@ h1 { font-size: 1.8rem; margin: 0 0 24px; }
 .status-badge.processing { background: #fef9c3; color: #854d0e; }
 .status-badge.in-transit { background: #dbeafe; color: #1e40af; }
 .status-badge.delivered { background: #dcfce7; color: #166534; }
+.status-badge.cancelled { background: #fee2e2; color: #991b1b; }
 
 .return-badge {
   display: inline-block;
@@ -289,7 +293,9 @@ code { background: #ede9fe; border-radius: 4px; padding: 1px 6px; font-size: 0.8
 }
 .btn.advance { background: #2563eb; color: #fff; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.return-photo { display: block; max-width: 200px; max-height: 160px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 8px; object-fit: cover; }
 .delivered-tag { font-size: 0.85rem; color: #166534; font-weight: 600; }
+.cancelled-tag { font-size: 0.85rem; color: #991b1b; font-weight: 600; }
 
 .empty { text-align: center; padding: 60px; color: #94a3b8; font-size: 0.95rem; }
 </style>
