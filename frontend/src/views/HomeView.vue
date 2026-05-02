@@ -134,6 +134,7 @@
           </select>
           <select v-model="sortBy" class="control-select">
             <option value="default">Featured first</option>
+            <option value="sale">On sale</option>
             <option value="price-asc">Price: Low to high</option>
             <option value="price-desc">Price: High to low</option>
             <option value="rating">Top rated</option>
@@ -465,8 +466,17 @@ const heroSlides = computed(() => [
   },
 ]);
 
+function isOnSale(p) {
+  const id = String(p?._id || p?.id || "");
+  return !"39f".includes(id.slice(-1));
+}
+
 const filteredProducts = computed(() => {
   let result = [...products];
+
+  if (sortBy.value === "sale") {
+    result = result.filter(isOnSale);
+  }
 
   if (selectedCategory.value !== "All") {
     result = result.filter((p) => p.category === selectedCategory.value);
@@ -474,19 +484,20 @@ const filteredProducts = computed(() => {
 
   if (localSearch.value.trim()) {
     const query = localSearch.value.trim().toLowerCase();
+    const wordRe = new RegExp(`\\b${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "i");
     result = result.filter((p) => {
-      const name = (p?.name ?? "").toString().toLowerCase();
-      const description = (p?.description ?? "").toString().toLowerCase();
-      const distributor = (p?.distributor ?? "").toString().toLowerCase();
-      const author = (p?.author ?? "").toString().toLowerCase();
-      const serialNumber = (p?.serialNumber ?? "").toString().toLowerCase();
+      const name = (p?.name ?? "").toString();
+      const description = (p?.description ?? "").toString();
+      const distributor = (p?.distributor ?? "").toString();
+      const author = (p?.author ?? "").toString();
+      const serialNumber = (p?.serialNumber ?? "").toString();
 
       return (
-        name.includes(query) ||
-        description.includes(query) ||
-        distributor.includes(query) ||
-        author.includes(query) ||
-        serialNumber.includes(query)
+        wordRe.test(name) ||
+        wordRe.test(description) ||
+        wordRe.test(distributor) ||
+        wordRe.test(author) ||
+        wordRe.test(serialNumber)
       );
     });
   }
@@ -495,7 +506,7 @@ const filteredProducts = computed(() => {
     result = result.filter((p) => p.quantity > 0);
   }
 
-  if (sortBy.value === "price-asc") {
+  if (sortBy.value === "price-asc" || sortBy.value === "sale") {
     result.sort((a, b) => a.price - b.price);
   } else if (sortBy.value === "price-desc") {
     result.sort((a, b) => b.price - a.price);

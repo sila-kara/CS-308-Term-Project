@@ -1,87 +1,67 @@
 <template>
   <div class="admin">
     <h1>Review moderation</h1>
-    <p class="lead">
-      Product manager console (demo). Approve reviews before they appear on
-      product pages.
-    </p>
+    <p class="lead">Approve or reject pending reviews before they appear on product pages.</p>
 
-    <div v-if="!unlocked" class="gate">
-      <label>
-        Manager passcode
-        <input v-model="passcode" type="password" placeholder="demo" />
-      </label>
-      <button type="button" class="btn" @click="tryUnlock">Unlock</button>
-      <p v-if="gateError" class="error">{{ gateError }}</p>
-      <p class="hint">Use passcode <code>demo</code> for class demos.</p>
-    </div>
+    <div v-if="loading" style="text-align:center;padding:40px;color:#64748b">Loading…</div>
 
-    <div v-else>
-      <p v-if="pending.length === 0" class="empty">No pending reviews.</p>
+    <template v-else>
+      <p v-if="pending.length === 0" class="empty">No pending reviews. 🎉</p>
       <ul v-else class="list">
-        <li v-for="item in pending" :key="item.id">
+        <li v-for="item in pending" :key="item._id">
           <div>
             <p class="title">
-              {{ item.authorName }} · {{ item.rating }}★ · product
-              #{{ item.productId }}
+              {{ item.maskedUserName }} · {{ item.rating }}★ · <em>{{ item.productName }}</em>
             </p>
-            <p class="text">{{ item.text }}</p>
+            <p class="text">{{ item.commentText || "— (rating only)" }}</p>
             <p class="meta">{{ formatDate(item.createdAt) }}</p>
           </div>
           <div class="actions">
-            <button type="button" class="ok" @click="approve(item.id)">
-              Approve
-            </button>
-            <button type="button" class="no" @click="reject(item.id)">
-              Reject
-            </button>
+            <button type="button" class="ok" :disabled="busy[item._id]" @click="approve(item._id)">Approve</button>
+            <button type="button" class="no" :disabled="busy[item._id]" @click="reject(item._id)">Reject</button>
           </div>
         </li>
       </ul>
-    </div>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { ref, reactive, onMounted } from "vue";
 import { useCommentsStore } from "../stores/comments";
 
-const ADMIN_KEY = "bookworld_admin_unlocked";
-const DEMO_PASS = "demo";
+const { fetchPending, listPending, approveReview, rejectReview } = useCommentsStore();
 
-const { listPending, approveReview, rejectReview } = useCommentsStore();
+const loading = ref(false);
+const busy = reactive({});
+const pending = ref([]);
 
-const unlocked = ref(localStorage.getItem(ADMIN_KEY) === "1");
-const passcode = ref("");
-const gateError = ref("");
-
-const pending = computed(() => listPending());
-
-function tryUnlock() {
-  gateError.value = "";
-  if (passcode.value === DEMO_PASS) {
-    localStorage.setItem(ADMIN_KEY, "1");
-    unlocked.value = true;
-    return;
-  }
-  gateError.value = "Invalid passcode.";
+async function load() {
+  loading.value = true;
+  await fetchPending();
+  pending.value = listPending();
+  loading.value = false;
 }
 
-function approve(id) {
-  approveReview(id);
+async function approve(id) {
+  busy[id] = true;
+  await approveReview(id);
+  pending.value = listPending();
+  busy[id] = false;
 }
 
-function reject(id) {
-  rejectReview(id);
+async function reject(id) {
+  busy[id] = true;
+  await rejectReview(id);
+  pending.value = listPending();
+  busy[id] = false;
 }
 
 function formatDate(iso) {
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
+  try { return new Date(iso).toLocaleString(); } catch { return iso; }
 }
+
+onMounted(load);
 </script>
 
 <style scoped>
@@ -90,58 +70,7 @@ function formatDate(iso) {
   margin: 0 auto;
   padding: 24px 20px 48px;
 }
-
-.lead {
-  color: #64748b;
-  margin-top: 6px;
-}
-
-.gate {
-  margin-top: 16px;
-  background: #fff;
-  border: 1px solid #dbe5f1;
-  border-radius: 8px;
-  padding: 16px;
-  display: grid;
-  gap: 10px;
-  max-width: 420px;
-}
-
-.gate label {
-  display: grid;
-  gap: 6px;
-  font-weight: 600;
-  font-size: 0.85rem;
-}
-
-.gate input {
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid #cfdbea;
-}
-
-.btn {
-  border-radius: 8px;
-  padding: 10px 12px;
-  border: 1px solid #cbd5e1;
-  background: #fff;
-  font-weight: 700;
-  cursor: pointer;
-  justify-self: start;
-}
-
-.error {
-  color: #b91c1c;
-  margin: 0;
-  font-size: 0.88rem;
-}
-
-.hint {
-  margin: 0;
-  font-size: 0.8rem;
-  color: #64748b;
-}
-
+.lead { color: #64748b; margin-top: 6px; }
 .list {
   list-style: none;
   margin: 16px 0 0;
@@ -149,7 +78,6 @@ function formatDate(iso) {
   display: grid;
   gap: 10px;
 }
-
 .list li {
   display: grid;
   grid-template-columns: 1fr auto;
@@ -159,52 +87,18 @@ function formatDate(iso) {
   border-radius: 8px;
   padding: 12px;
 }
-
-.title {
-  margin: 0;
-  font-weight: 800;
-  font-size: 0.9rem;
-}
-
-.text {
-  margin: 6px 0;
-  color: #334155;
-}
-
-.meta {
-  margin: 0;
-  font-size: 0.78rem;
-  color: #94a3b8;
-}
-
-.actions {
-  display: grid;
-  gap: 8px;
-  align-content: start;
-}
-
+.title { margin: 0; font-weight: 800; font-size: 0.9rem; }
+.text { margin: 6px 0; color: #334155; }
+.meta { margin: 0; font-size: 0.78rem; color: #94a3b8; }
+.actions { display: grid; gap: 8px; align-content: start; }
 .ok {
-  border: none;
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: #22c55e;
-  color: white;
-  font-weight: 700;
-  cursor: pointer;
+  border: none; border-radius: 8px; padding: 8px 10px;
+  background: #22c55e; color: white; font-weight: 700; cursor: pointer;
 }
-
 .no {
-  border: none;
-  border-radius: 8px;
-  padding: 8px 10px;
-  background: #fee2e2;
-  color: #991b1b;
-  font-weight: 700;
-  cursor: pointer;
+  border: none; border-radius: 8px; padding: 8px 10px;
+  background: #fee2e2; color: #991b1b; font-weight: 700; cursor: pointer;
 }
-
-.empty {
-  margin-top: 12px;
-  color: #64748b;
-}
+.ok:disabled, .no:disabled { opacity: 0.5; cursor: not-allowed; }
+.empty { margin-top: 12px; color: #64748b; }
 </style>

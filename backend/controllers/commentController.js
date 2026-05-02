@@ -1,4 +1,15 @@
 const Comment = require("../models/Comment");
+const Product = require("../models/Product");
+
+async function updateProductRating(productId) {
+  const approved = await Comment.find({ productId, status: "approved" });
+  const count = approved.length;
+  const avg = count > 0 ? approved.reduce((s, c) => s + c.rating, 0) / count : 0;
+  await Product.findByIdAndUpdate(productId, {
+    rating: Math.round(avg * 10) / 10,
+    ratingCount: count,
+  });
+}
 
 const maskName = (fullName) => {
   if (!fullName) return "";
@@ -29,15 +40,20 @@ exports.createComment = async (req, res) => {
       });
     }
 
+    const hasText = commentText && commentText.trim().length > 0;
+
     const newComment = new Comment({
       userId,
       productId,
       rating,
       commentText: commentText || "",
-      status: "pending"
+      status: hasText ? "pending" : "approved",
     });
 
     await newComment.save();
+
+    // If auto-approved (star-only), update product rating immediately
+    if (!hasText) await updateProductRating(productId);
 
     res.status(201).json({
       message: "Comment submitted successfully",
@@ -77,13 +93,6 @@ exports.getApprovedCommentsByProduct = async (req, res) => {
 exports.approveComment = async (req, res) => {
   try {
     const { commentId } = req.params;
-    const { role } = req.body;
-
-    if (role !== "product_manager") {
-      return res.status(403).json({
-        message: "Only product managers can approve comments"
-      });
-    }
 
     const updatedComment = await Comment.findByIdAndUpdate(
       commentId,
@@ -94,6 +103,8 @@ exports.approveComment = async (req, res) => {
     if (!updatedComment) {
       return res.status(404).json({ message: "Comment not found" });
     }
+
+    await updateProductRating(updatedComment.productId);
 
     res.status(200).json({
       message: "Comment approved successfully",
@@ -107,14 +118,6 @@ exports.approveComment = async (req, res) => {
 exports.rejectComment = async (req, res) => {
   try {
     const { commentId } = req.params;
-    const { role } = req.body;
-
-    if (role !== "product_manager") {
-      return res.status(403).json({
-        message: "Only product managers can reject comments"
-      });
-    }
-
     const updatedComment = await Comment.findByIdAndUpdate(
       commentId,
       { status: "rejected" },
@@ -129,6 +132,29 @@ exports.rejectComment = async (req, res) => {
       message: "Comment rejected successfully",
       comment: updatedComment
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.getPendingComments = async (req, res) => {
+  try {
+    const comments = await Comment.find({ status: "pending" })
+      .populate("userId", "name")
+      .populate("productId", "name")
+      .sort({ createdAt: -1 });
+
+    const formatted = comments.map(c => ({
+      _id: c._id,
+      productId: c.productId?._id,
+      productName: c.productId?.name || "",
+      rating: c.rating,
+      commentText: c.commentText,
+      createdAt: c.createdAt,
+      maskedUserName: maskName(c.userId?.name || ""),
+    }));
+
+    res.status(200).json(formatted);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

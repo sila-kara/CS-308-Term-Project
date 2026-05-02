@@ -70,6 +70,22 @@
             </span>
             <span>Currently unavailable</span>
           </div>
+
+          <!-- Wishlist button -->
+          <button
+            type="button"
+            class="wishlist-detail-btn"
+            :class="{ active: isWishlisted }"
+            :aria-label="isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'"
+            @click="toggleWishlist(product._id || product.id)"
+          >
+            <svg v-if="isWishlisted" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+              <path fill="currentColor" d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+            <svg v-else xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="22" height="22" fill="none" aria-hidden="true">
+              <path stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/>
+            </svg>
+          </button>
         </div>
 
         <p v-if="cartMessage" class="cart-toast">{{ cartMessage }}</p>
@@ -83,12 +99,12 @@
       </div>
 
       <ul v-if="approvedReviews.length" class="review-list">
-        <li v-for="r in approvedReviews" :key="r.id">
+        <li v-for="r in approvedReviews" :key="r._id">
           <div class="review-top">
-            <strong>{{ r.authorName }}</strong>
+            <strong>{{ r.maskedUserName }}</strong>
             <span class="stars-mini">{{ "★".repeat(r.rating) }}</span>
           </div>
-          <p>{{ r.text }}</p>
+          <p v-if="r.commentText">{{ r.commentText }}</p>
         </li>
       </ul>
       <p v-else class="no-reviews">No approved reviews yet. Be the first.</p>
@@ -131,23 +147,27 @@ import { useProductsStore } from "../stores/products.js";
 import { useCartStore } from "../stores/cart";
 import { useAuthStore } from "../stores/auth";
 import { useCommentsStore } from "../stores/comments";
+import { useWishlistStore } from "../stores/wishlist";
 
 const route = useRoute();
 const router = useRouter();
 const { addToCart } = useCartStore();
 const { isLoggedIn, state: authState } = useAuthStore();
-const { listApprovedForProduct, submitReview: postReview } =
+const { fetchApprovedForProduct, listApprovedForProduct, submitReview: postReview } =
   useCommentsStore();
 const { fetchProductById } = useProductsStore();
+const { isInWishlist, toggleWishlist } = useWishlistStore();
+const isWishlisted = computed(() => product.value ? isInWishlist(product.value._id || product.value.id) : false);
 
 const product = ref(null);
 
 onMounted(async () => {
   product.value = await fetchProductById(route.params.id);
+  if (product.value) await fetchApprovedForProduct(product.value._id || product.value.id);
 });
 
 const approvedReviews = computed(() =>
-  product.value ? listApprovedForProduct(product.value.id) : [],
+  product.value ? listApprovedForProduct(product.value._id || product.value.id) : [],
 );
 
 const draftRating = ref(5);
@@ -164,6 +184,7 @@ watch(
     draftText.value = "";
     draftRating.value = 5;
     product.value = await fetchProductById(id);
+    if (product.value) await fetchApprovedForProduct(product.value._id || product.value.id);
   },
 );
 
@@ -176,13 +197,13 @@ function addCurrentProductToCart() {
   }, 2400);
 }
 
-function submitReview() {
+async function submitReview() {
   reviewError.value = "";
   reviewSuccess.value = "";
   if (!product.value) return;
-  const res = postReview({
-    productId: product.value.id,
-    authorName: authState.user?.name || "Reader",
+  const res = await postReview({
+    productId: product.value._id || product.value.id,
+    userId: authState.user?.id,
     rating: draftRating.value,
     text: draftText.value,
   });
@@ -190,9 +211,17 @@ function submitReview() {
     reviewError.value = res.error;
     return;
   }
-  reviewSuccess.value =
-    "Thanks! Your review will appear after a product manager approves it.";
+  const hasText = draftText.value.trim().length > 0;
+  reviewSuccess.value = hasText
+    ? "Thanks! Your review will appear after a product manager approves it."
+    : "Thanks! Your rating has been submitted.";
   draftText.value = "";
+  draftRating.value = 5;
+
+  // Refetch product to get updated rating/ratingCount
+  const updated = await fetchProductById(product.value._id || product.value.id);
+  if (updated) product.value = updated;
+  await fetchApprovedForProduct(product.value._id || product.value.id);
 }
 </script>
 
@@ -374,6 +403,31 @@ function submitReview() {
   color: #cbd5e1;
   display: grid;
   place-items: center;
+}
+
+.wishlist-detail-btn {
+  width: 52px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  flex-shrink: 0;
+}
+.wishlist-detail-btn:hover {
+  border-color: #fda4af;
+  background: #fff1f2;
+  color: #e11d48;
+}
+.wishlist-detail-btn.active {
+  border-color: #fda4af;
+  background: #fff1f2;
+  color: #e11d48;
 }
 
 .cart-toast {

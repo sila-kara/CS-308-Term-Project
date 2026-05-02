@@ -5,13 +5,16 @@ const {
   getApprovedCommentsByProduct,
   approveComment,
   rejectComment,
-  getAverageRating
+  getAverageRating,
+  getPendingComments,
 } = require("../controllers/commentController");
+const { authMiddleware, requireRole } = require("../middleware/auth");
 
 router.post("/", createComment);
+router.get("/pending", authMiddleware, requireRole("product_manager"), getPendingComments);
 router.get("/average/:productId", getAverageRating);
 router.get("/:productId", getApprovedCommentsByProduct);
-router.patch("/approve/:commentId", approveComment);
-router.patch("/reject/:commentId", rejectComment);
+router.patch("/approve/:commentId", authMiddleware, requireRole("product_manager"), approveComment);
+router.patch("/reject/:commentId", authMiddleware, requireRole("product_manager"), rejectComment);
 
 module.exports = router;

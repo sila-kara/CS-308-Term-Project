@@ -12,7 +12,7 @@ function generateInvoicePdf(order, userName) {
     // Header
     doc.fontSize(22).font("Helvetica-Bold").text("BookWorld", 50, 50);
     doc.fontSize(10).font("Helvetica").fillColor("#555")
-      .text("bookworld.com  |  support@bookworld.com", 50, 78);
+      .text("bookworld.com  |  bookworld.store.cs308@gmail.com", 50, 78);
 
     doc.moveTo(50, 100).lineTo(545, 100).strokeColor("#ddd").stroke();
 

@@ -23,6 +23,7 @@
           <router-link v-if="error.includes('create an account')" to="/register"> Create an account →</router-link>
         </p>
         <button class="btn primary" type="submit">Sign in</button>
+        <p class="forgot"><router-link to="/forgot-password">Forgot your password?</router-link></p>
       </form>
 
       <p class="footer">
@@ -54,6 +55,11 @@ async function onSubmit() {
   });
   if (!res.ok) {
     error.value = res.error;
+    return;
+  }
+  const { state } = useAuthStore();
+  if (state.user?.role === "product_manager") {
+    router.push("/admin/orders");
     return;
   }
   const redirect = route.query.redirect;
@@ -126,6 +132,17 @@ input {
 .btn.primary {
   background: linear-gradient(145deg, #1d4ed8, #2563eb);
   color: white;
+}
+
+.forgot {
+  margin: 0;
+  text-align: right;
+  font-size: 0.82rem;
+}
+
+.forgot a {
+  color: #2563eb;
+  text-decoration: none;
 }
 
 .footer {
