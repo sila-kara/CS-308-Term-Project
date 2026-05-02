@@ -93,6 +93,9 @@ exports.advanceStatus = async (req, res) => {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
 
+    if (order.status === "cancelled")
+      return res.status(400).json({ message: "Cancelled orders cannot be advanced." });
+
     const currentIndex = STATUS_SEQUENCE.indexOf(order.status);
     if (currentIndex === STATUS_SEQUENCE.length - 1)
       return res.status(400).json({ message: "Order already delivered" });
@@ -152,7 +155,7 @@ exports.requestReturn = async (req, res) => {
     if (daysSinceDelivery > 30)
       return res.status(400).json({ message: "Return window has expired (30 days)." });
 
-    const { returnItems, returnReason } = req.body;
+    const { returnItems, returnReason, returnPhoto } = req.body;
     const { company, code } = randomCargoCode();
 
     order.returnStatus = "requested";
@@ -160,6 +163,7 @@ exports.requestReturn = async (req, res) => {
     order.returnCargoCompany = company;
     order.returnItems = returnItems || [];
     order.returnReason = returnReason || "";
+    order.returnPhoto = returnPhoto || null;
     order.returnRequestedAt = new Date();
     await order.save();
 

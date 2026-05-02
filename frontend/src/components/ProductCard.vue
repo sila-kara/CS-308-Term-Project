@@ -55,7 +55,7 @@
         @error="onImageError"
       />
       <span class="badge" v-if="product.quantity === 0">Sold out</span>
-      <span class="badge top" v-else-if="product.rating >= 4.8 && product.ratingCount >= 50">Top rated</span>
+      <span class="badge top" v-else-if="isTopRated(product)">Top rated</span>
     </div>
 
     <div class="product-info">
@@ -131,6 +131,7 @@ import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useCartStore } from "../stores/cart";
 import { useWishlistStore } from "../stores/wishlist";
+import { isOnSale, isTopRated } from "../utils/productUtils";
 
 const props = defineProps({
   product: {
@@ -146,12 +147,7 @@ const { isInWishlist, toggleWishlist: toggleWishlistItem } = useWishlistStore();
 const imageFailed = ref(false);
 const isWishlisted = computed(() => isInWishlist(props.product?.id));
 
-// Deterministic per-product: show discount on ~60% of products based on ID
-const hasDiscount = computed(() => {
-  const id = String(props.product?._id || props.product?.id || "");
-  const lastChar = id.slice(-1);
-  return !"39f".includes(lastChar); // ~60% show discount
-});
+const hasDiscount = computed(() => isOnSale(props.product));
 const placeholderImage =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='1125' viewBox='0 0 900 1125'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23f8fafc'/%3E%3Cstop offset='1' stop-color='%23e2e8f0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='900' height='1125' fill='url(%23g)'/%3E%3Crect x='78' y='92' width='744' height='940' rx='38' fill='%23ffffff' opacity='0.75'/%3E%3Cpath d='M322 390h256c22 0 40 18 40 40v240c0 22-18 40-40 40H322c-22 0-40-18-40-40V430c0-22 18-40 40-40z' fill='%23e2e8f0'/%3E%3Cpath d='M370 520l64 64l44-44l116 116H306l64-64z' fill='%23cbd5e1'/%3E%3Ccircle cx='536' cy='486' r='28' fill='%2394a3b8'/%3E%3Cpath d='M294 786h312' stroke='%23cbd5e1' stroke-width='26' stroke-linecap='round'/%3E%3Cpath d='M294 856h248' stroke='%23e2e8f0' stroke-width='24' stroke-linecap='round'/%3E%3Ctext x='450' y='326' text-anchor='middle' font-family='ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial' font-weight='700' font-size='46' fill='%2364748b'%3ENo image%3C/text%3E%3C/svg%3E";
 
