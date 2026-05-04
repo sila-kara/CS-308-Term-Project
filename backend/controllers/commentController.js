@@ -1,10 +1,16 @@
 const Comment = require("../models/Comment");
 const Product = require("../models/Product");
+const Order = require("../models/Order");
 
 async function updateProductRating(productId) {
-  const approved = await Comment.find({ productId, status: "approved" });
-  const count = approved.length;
-  const avg = count > 0 ? approved.reduce((s, c) => s + c.rating, 0) / count : 0;
+  const reviews = await Comment.find({ productId });
+
+  const count = reviews.length;
+  const avg =
+    count > 0
+      ? reviews.reduce((sum, review) => sum + review.rating, 0) / count
+      : 0;
+
   await Product.findByIdAndUpdate(productId, {
     rating: Math.round(avg * 10) / 10,
     ratingCount: count,
@@ -26,40 +32,92 @@ const maskName = (fullName) => {
 
 exports.createComment = async (req, res) => {
   try {
-    const { userId, productId, rating, commentText } = req.body;
+    const { productId, rating, commentText } = req.body;
+    const userId = req.user?.id;
 
     if (!userId || !productId || !rating) {
       return res.status(400).json({
-        message: "userId, productId and rating are required"
+        message: "productId and rating are required"
       });
     }
 
-    if (rating < 1 || rating > 5) {
+    const numericRating = Number(rating);
+
+    if (!Number.isInteger(numericRating) || numericRating < 1 || numericRating > 5) {
       return res.status(400).json({
         message: "Rating must be between 1 and 5"
       });
     }
 
-    const hasText = commentText && commentText.trim().length > 0;
-
-    const newComment = new Comment({
+    const deliveredOrder = await Order.findOne({
       userId,
-      productId,
-      rating,
-      commentText: commentText || "",
-      status: hasText ? "pending" : "approved",
+      status: "delivered",
+      "items.productId": productId
     });
 
-    await newComment.save();
+    if (!deliveredOrder) {
+      return res.status(403).json({
+        message: "You can review this product only after it has been delivered."
+      });
+    }
 
-    // If auto-approved (star-only), update product rating immediately
-    if (!hasText) await updateProductRating(productId);
+    const trimmedText = String(commentText || "").trim();
 
-    res.status(201).json({
-      message: "Comment submitted successfully",
-      comment: newComment
+    const commentStatus = trimmedText.length > 0 ? "pending" : "approved";
+
+    let comment = await Comment.findOne({ userId, productId });
+    let isUpdate = false;
+
+    if (comment) {
+      comment.rating = numericRating;
+      comment.commentText = trimmedText;
+      comment.commentStatus = commentStatus;
+      isUpdate = true;
+      await comment.save();
+    } else {
+      comment = await Comment.create({
+        userId,
+        productId,
+        rating: numericRating,
+        commentText: trimmedText,
+        commentStatus
+      });
+    }
+
+    await updateProductRating(productId);
+
+    res.status(isUpdate ? 200 : 201).json({
+      message: isUpdate
+        ? "Review updated successfully"
+        : "Review submitted successfully",
+      comment,
+      updated: isUpdate
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
+exports.getMyCommentByProduct = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const userId = req.user?.id;
+
+    const comment = await Comment.findOne({ userId, productId });
+
+    if (!comment) {
+      return res.status(200).json(null);
+    }
+
+    res.status(200).json({
+      _id: comment._id,
+      userId: comment.userId,
+      productId: comment.productId,
+      rating: comment.rating,
+      commentText: comment.commentText,
+      commentStatus: comment.commentStatus,
+      createdAt: comment.createdAt
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -69,16 +127,18 @@ exports.getApprovedCommentsByProduct = async (req, res) => {
   try {
     const { productId } = req.params;
 
-    const comments = await Comment.find({
-      productId,
-      status: "approved"
-    }).populate("userId", "name");
+    const comments = await Comment.find({ productId })
+      .populate("userId", "name")
+      .sort({ createdAt: -1 });
 
     const formattedComments = comments.map(comment => ({
       _id: comment._id,
+      userId: comment.userId?._id,
       productId: comment.productId,
       rating: comment.rating,
-      commentText: comment.commentText,
+      commentText:
+        comment.commentStatus === "approved" ? comment.commentText : "",
+      commentStatus: comment.commentStatus,
       createdAt: comment.createdAt,
       maskedUserName: maskName(comment.userId?.name || "")
     }));
@@ -96,7 +156,7 @@ exports.approveComment = async (req, res) => {
 
     const updatedComment = await Comment.findByIdAndUpdate(
       commentId,
-      { status: "approved" },
+      { commentStatus: "approved" },
       { new: true }
     );
 
@@ -118,15 +178,21 @@ exports.approveComment = async (req, res) => {
 exports.rejectComment = async (req, res) => {
   try {
     const { commentId } = req.params;
+
     const updatedComment = await Comment.findByIdAndUpdate(
       commentId,
-      { status: "rejected" },
+      {
+        commentText: "",
+        commentStatus: "rejected"
+      },
       { new: true }
     );
 
     if (!updatedComment) {
       return res.status(404).json({ message: "Comment not found" });
     }
+
+    await updateProductRating(updatedComment.productId);
 
     res.status(200).json({
       message: "Comment rejected successfully",
@@ -139,7 +205,10 @@ exports.rejectComment = async (req, res) => {
 
 exports.getPendingComments = async (req, res) => {
   try {
-    const comments = await Comment.find({ status: "pending" })
+    const comments = await Comment.find({
+      commentStatus: "pending",
+      commentText: { $ne: "" }
+    })
       .populate("userId", "name")
       .populate("productId", "name")
       .sort({ createdAt: -1 });
@@ -150,6 +219,7 @@ exports.getPendingComments = async (req, res) => {
       productName: c.productId?.name || "",
       rating: c.rating,
       commentText: c.commentText,
+      commentStatus: c.commentStatus,
       createdAt: c.createdAt,
       maskedUserName: maskName(c.userId?.name || ""),
     }));
@@ -164,10 +234,7 @@ exports.getAverageRating = async (req, res) => {
   try {
     const { productId } = req.params;
 
-    const comments = await Comment.find({
-      productId,
-      status: "approved"
-    });
+    const comments = await Comment.find({ productId });
 
     if (comments.length === 0) {
       return res.status(200).json({

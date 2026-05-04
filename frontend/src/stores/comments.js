@@ -2,8 +2,8 @@ import { reactive } from "vue";
 import api from "../utils/api.js";
 
 const state = reactive({
-  reviews: [],          // approved reviews per product (keyed by productId)
-  pending: [],          // pending reviews for admin
+  reviews: [],
+  pending: [],
 });
 
 async function fetchApprovedForProduct(productId) {
@@ -12,6 +12,15 @@ async function fetchApprovedForProduct(productId) {
     state.reviews = data;
   } catch {
     state.reviews = [];
+  }
+}
+
+async function fetchMyReviewForProduct(productId) {
+  try {
+    const { data } = await api.get(`/comments/mine/${productId}`);
+    return data;
+  } catch {
+    return null;
   }
 }
 
@@ -32,10 +41,9 @@ function listPending() {
   return state.pending;
 }
 
-async function submitReview({ productId, userId, rating, text }) {
+async function submitReview({ productId, rating, text }) {
   try {
     await api.post("/comments", {
-      userId,
       productId,
       rating,
       commentText: text || "",
@@ -70,6 +78,7 @@ export function useCommentsStore() {
   return {
     state,
     fetchApprovedForProduct,
+    fetchMyReviewForProduct,
     listApprovedForProduct,
     fetchPending,
     listPending,
