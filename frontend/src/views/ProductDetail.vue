@@ -71,7 +71,6 @@
             <span>Currently unavailable</span>
           </div>
 
-          <!-- Wishlist button -->
           <button
             type="button"
             class="wishlist-detail-btn"
@@ -95,7 +94,7 @@
     <section class="reviews" v-if="product">
       <div class="reviews-head">
         <h2>Customer reviews</h2>
-        <p>Only approved reviews are shown publicly.</p>
+        <p>Ratings are shown immediately. Review text appears after approval.</p>
       </div>
 
       <ul v-if="approvedReviews.length" class="review-list">
@@ -104,13 +103,16 @@
             <strong>{{ r.maskedUserName }}</strong>
             <span class="stars-mini">{{ "★".repeat(r.rating) }}</span>
           </div>
-          <p v-if="r.commentText">{{ r.commentText }}</p>
+
+          <p v-if="r.commentStatus === 'approved' && r.commentText">
+            {{ r.commentText }}
+          </p>
         </li>
       </ul>
-      <p v-else class="no-reviews">No approved reviews yet. Be the first.</p>
+      <p v-else class="no-reviews">No reviews yet. Be the first.</p>
 
       <div v-if="isLoggedIn" class="review-form">
-        <h3>Write a review</h3>
+        <h3>{{ myReview ? "Edit your review" : "Write a review" }}</h3>
         <label>
           Rating
           <select v-model.number="draftRating">
@@ -124,7 +126,7 @@
         <p v-if="reviewError" class="review-error">{{ reviewError }}</p>
         <p v-if="reviewSuccess" class="review-success">{{ reviewSuccess }}</p>
         <button type="button" class="submit-review" @click="submitReview">
-          Submit for approval
+          {{ myReview ? "Update review" : "Submit review" }}
         </button>
       </div>
       <p v-else class="login-hint">
@@ -152,19 +154,20 @@ import { useWishlistStore } from "../stores/wishlist";
 const route = useRoute();
 const router = useRouter();
 const { addToCart } = useCartStore();
-const { isLoggedIn, state: authState } = useAuthStore();
-const { fetchApprovedForProduct, listApprovedForProduct, submitReview: postReview } =
+const { isLoggedIn } = useAuthStore();
+const {
+  fetchApprovedForProduct,
+  fetchMyReviewForProduct,
+  listApprovedForProduct,
+  submitReview: postReview
+} =
   useCommentsStore();
 const { fetchProductById } = useProductsStore();
 const { isInWishlist, toggleWishlist } = useWishlistStore();
 const isWishlisted = computed(() => product.value ? isInWishlist(product.value._id || product.value.id) : false);
 
 const product = ref(null);
-
-onMounted(async () => {
-  product.value = await fetchProductById(route.params.id);
-  if (product.value) await fetchApprovedForProduct(product.value._id || product.value.id);
-});
+const myReview = ref(null);
 
 const approvedReviews = computed(() =>
   product.value ? listApprovedForProduct(product.value._id || product.value.id) : [],
@@ -176,15 +179,40 @@ const reviewError = ref("");
 const reviewSuccess = ref("");
 const cartMessage = ref("");
 
+async function loadMyReview(productId) {
+  myReview.value = null;
+  draftText.value = "";
+  draftRating.value = 5;
+
+  if (!isLoggedIn.value) return;
+
+  const my = await fetchMyReviewForProduct(productId);
+  if (my) {
+    myReview.value = my;
+    draftRating.value = my.rating;
+    draftText.value = my.commentText || "";
+  }
+}
+
+async function loadProductDetail(id) {
+  product.value = await fetchProductById(id);
+  if (!product.value) return;
+
+  const productId = product.value._id || product.value.id;
+  await fetchApprovedForProduct(productId);
+  await loadMyReview(productId);
+}
+
+onMounted(async () => {
+  await loadProductDetail(route.params.id);
+});
+
 watch(
   () => route.params.id,
   async (id) => {
     reviewError.value = "";
     reviewSuccess.value = "";
-    draftText.value = "";
-    draftRating.value = 5;
-    product.value = await fetchProductById(id);
-    if (product.value) await fetchApprovedForProduct(product.value._id || product.value.id);
+    await loadProductDetail(id);
   },
 );
 
@@ -203,7 +231,6 @@ async function submitReview() {
   if (!product.value) return;
   const res = await postReview({
     productId: product.value._id || product.value.id,
-    userId: authState.user?.id,
     rating: draftRating.value,
     text: draftText.value,
   });
@@ -215,13 +242,12 @@ async function submitReview() {
   reviewSuccess.value = hasText
     ? "Thanks! Your review will appear after a product manager approves it."
     : "Thanks! Your rating has been submitted.";
-  draftText.value = "";
-  draftRating.value = 5;
 
   // Refetch product to get updated rating/ratingCount
   const updated = await fetchProductById(product.value._id || product.value.id);
   if (updated) product.value = updated;
   await fetchApprovedForProduct(product.value._id || product.value.id);
+  await loadMyReview(product.value._id || product.value.id);
 }
 </script>
 

@@ -22,7 +22,7 @@ const commentSchema = new mongoose.Schema({
     trim: true,
     default: ""
   },
-  status: {
+  commentStatus: {
     type: String,
     enum: ["pending", "approved", "rejected"],
     default: "pending"
@@ -32,5 +32,10 @@ const commentSchema = new mongoose.Schema({
     default: Date.now
   }
 });
+
+commentSchema.index(
+  { userId: 1, productId: 1 },
+  { unique: true }
+);
 
 module.exports = mongoose.model("Comment", commentSchema);
