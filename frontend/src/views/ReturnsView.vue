@@ -14,12 +14,24 @@
             <span class="date">Delivered {{ formatDate(order.updatedAt) }}</span>
           </div>
 
-          <!-- Already returned -->
-          <div v-if="order.returnStatus" class="return-info">
-            <p class="return-badge">✅ Return requested</p>
+          <!-- Return requested / pending -->
+          <div v-if="order.returnStatus === 'requested'" class="return-info pending">
+            <p class="return-badge">🕐 Return request pending</p>
+            <p class="hint">Your return request is being reviewed. You will be notified by email once it is approved or rejected.</p>
+          </div>
+
+          <!-- Return approved -->
+          <div v-else-if="order.returnStatus === 'approved'" class="return-info approved">
+            <p class="return-badge">✅ Return approved</p>
             <p><strong>Cargo company:</strong> {{ order.returnCargoCompany }}</p>
             <p><strong>Tracking code:</strong> <code>{{ order.returnCargoCode }}</code></p>
-            <p class="hint">Drop the parcel off at any {{ order.returnCargoCompany }} branch using this code.</p>
+            <p class="hint">Drop the parcel off at any {{ order.returnCargoCompany }} branch within 7 days using this code.</p>
+          </div>
+
+          <!-- Return rejected -->
+          <div v-else-if="order.returnStatus === 'rejected'" class="return-info rejected">
+            <p class="return-badge">❌ Return rejected</p>
+            <p v-if="order.returnRejectionReason" class="hint">Reason: {{ order.returnRejectionReason }}</p>
           </div>
 
           <!-- Window expired -->
@@ -162,8 +174,14 @@ h1 { font-size: 1.9rem; margin: 0 0 8px; }
 .select-label { margin: 0; font-size: 0.88rem; font-weight: 600; color: #334155; }
 .item-row label { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; cursor: pointer; }
 
-.return-info { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 14px; }
-.return-badge { margin: 0 0 8px; font-weight: 700; color: #166534; }
+.return-info { border-radius: 8px; padding: 14px; }
+.return-info.pending  { background: #fefce8; border: 1px solid #fde68a; }
+.return-info.approved { background: #f0fdf4; border: 1px solid #bbf7d0; }
+.return-info.rejected { background: #fff1f2; border: 1px solid #fecdd3; }
+.return-badge { margin: 0 0 8px; font-weight: 700; }
+.return-info.pending  .return-badge { color: #92400e; }
+.return-info.approved .return-badge { color: #166534; }
+.return-info.rejected .return-badge { color: #9f1239; }
 .return-info p { margin: 4px 0; font-size: 0.9rem; }
 code { background: #e2e8f0; border-radius: 4px; padding: 2px 6px; font-size: 0.88rem; }
 .hint { color: #475569; font-size: 0.82rem; margin-top: 6px !important; }

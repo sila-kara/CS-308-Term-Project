@@ -2,7 +2,13 @@
   <div class="admin-page">
     <h1>Order Management</h1>
 
-    <div v-if="loading" style="text-align:center;padding:60px;color:#64748b">Loading orders…</div>
+    <div v-if="loading" class="skeleton-list">
+      <div v-for="n in 5" :key="n" class="skeleton-card">
+        <div class="sk-line wide"></div>
+        <div class="sk-line medium"></div>
+        <div class="sk-line short"></div>
+      </div>
+    </div>
     <div v-else-if="error" style="text-align:center;padding:60px;color:#b91c1c">{{ error }}</div>
 
     <template v-else>
@@ -182,6 +188,30 @@ onMounted(loadOrders);
 </script>
 
 <style scoped>
+@keyframes shimmer {
+  0% { background-position: -600px 0; }
+  100% { background-position: 600px 0; }
+}
+.skeleton-list { display: grid; gap: 12px; }
+.skeleton-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 20px;
+  display: grid;
+  gap: 10px;
+}
+.sk-line {
+  height: 14px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 600px 100%;
+  animation: shimmer 1.4s infinite;
+}
+.sk-line.wide { width: 100%; }
+.sk-line.medium { width: 60%; }
+.sk-line.short { width: 35%; }
+
 .admin-page {
   max-width: 960px;
   margin: 0 auto;
