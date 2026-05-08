@@ -137,6 +137,8 @@
             <option value="sale">On sale</option>
             <option value="price-asc">Price: Low to high</option>
             <option value="price-desc">Price: High to low</option>
+            <option value="popularity-asc">Popularity: Low to high</option>
+            <option value="popularity-desc">Popularity: High to low</option>
             <option value="rating">Top rated</option>
             <option value="newest">Newest arrivals</option>
           </select>
@@ -507,6 +509,10 @@ const filteredProducts = computed(() => {
     result.sort((a, b) => a.price - b.price);
   } else if (sortBy.value === "price-desc") {
     result.sort((a, b) => b.price - a.price);
+  } else if (sortBy.value === "popularity-desc") {
+    result.sort((a, b) => (b.ratingCount ?? 0) - (a.ratingCount ?? 0));
+  } else if (sortBy.value === "popularity-asc") {
+    result.sort((a, b) => (a.ratingCount ?? 0) - (b.ratingCount ?? 0));
   } else if (sortBy.value === "rating") {
     result.sort((a, b) => b.rating - a.rating);
   } else if (sortBy.value === "newest") {
@@ -999,8 +1005,8 @@ const featuredBooks = computed(() => {
   border: 1px solid rgba(148, 163, 184, 0.55);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.92);
-  padding: 11px 12px;
-  height: 44px;
+  padding: 13px 12px;
+  height: 52px;
   transition: box-shadow 160ms ease, border-color 160ms ease,
     background 160ms ease;
 }
