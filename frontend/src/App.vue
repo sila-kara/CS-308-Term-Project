@@ -16,23 +16,30 @@
 </template>
 
 <script setup>
-import { computed, watch } from "vue";
+import { computed, onMounted, watch } from "vue";
 import { useRoute } from "vue-router";
 import Navbar from "./components/Navbar.vue";
 import AdminNav from "./components/AdminNav.vue";
 import Footer from "./components/Footer.vue";
 import { useWishlistStore } from "./stores/wishlist";
 import { useAuthStore } from "./stores/auth";
+import { useProductsStore } from "./stores/products";
 
 const route = useRoute();
 const isAdminRoute = computed(() => route.path.startsWith("/admin"));
 
 const { loadWishlist } = useWishlistStore();
 const { state: authState } = useAuthStore();
+const { fetchProducts } = useProductsStore();
+
+// Fetch products once at app startup so categories are always available
+onMounted(() => {
+  fetchProducts();
+});
 
 watch(() => authState.user, (user) => {
   if (user) loadWishlist();
-  else loadWishlist(); // clears when logged out
+  else loadWishlist();
 }, { immediate: true });
 </script>
 
