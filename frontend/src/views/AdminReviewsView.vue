@@ -27,6 +27,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: "AdminReviewsView" });
 import { ref, reactive, onMounted } from "vue";
 import { useCommentsStore } from "../stores/comments";
 

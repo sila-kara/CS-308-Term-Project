@@ -91,6 +91,7 @@
 </template>
 
 <script setup>
+defineOptions({ name: "AdminOrdersView" });
 import { ref, computed, reactive, onMounted } from "vue";
 import api from "../utils/api.js";
 

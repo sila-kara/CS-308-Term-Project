@@ -5,7 +5,11 @@
       <Navbar />
     </template>
     <main class="main-content">
-      <router-view />
+      <router-view v-slot="{ Component, route }">
+        <keep-alive :include="['AdminOrdersView', 'AdminReviewsView']">
+          <component :is="Component" :key="route.path" />
+        </keep-alive>
+      </router-view>
     </main>
     <Footer v-if="!isAdminRoute" />
   </div>
