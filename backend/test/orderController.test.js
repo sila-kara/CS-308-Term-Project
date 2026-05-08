@@ -52,6 +52,36 @@ test("createOrder rejects an empty cart", async () => {
   assert.deepEqual(res.body, { message: "Order must have at least one item" });
 });
 
+test("createOrder rejects checkout when a product cannot be found", async () => {
+  const originalFindById = Product.findById;
+  const originalFindByIdAndUpdate = Product.findByIdAndUpdate;
+  const originalCreate = Order.create;
+
+  const stockUpdates = [];
+  Product.findById = async () => null;
+  Product.findByIdAndUpdate = async (...args) => {
+    stockUpdates.push(args);
+  };
+  Order.create = async () => {
+    throw new Error("Order should not be created");
+  };
+
+  const req = { user: { id: "user-1" }, body: makeOrderBody() };
+  const res = makeRes();
+
+  try {
+    await createOrder(req, res);
+  } finally {
+    Product.findById = originalFindById;
+    Product.findByIdAndUpdate = originalFindByIdAndUpdate;
+    Order.create = originalCreate;
+  }
+
+  assert.equal(res.statusCode, 404);
+  assert.deepEqual(res.body, { message: "Product not found: product-1" });
+  assert.equal(stockUpdates.length, 0);
+});
+
 test("createOrder rejects checkout when stock is insufficient", async () => {
   const originalFindById = Product.findById;
   const originalFindByIdAndUpdate = Product.findByIdAndUpdate;
