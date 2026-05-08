@@ -15,6 +15,7 @@ const productSchema = new mongoose.Schema(
     price: { type: Number, required: true, min: 0 },
     warranty: { type: String, default: "" },
     distributor: { type: String, default: "" },
+    author: { type: String, default: "" },
     rating: { type: Number, default: 0 },
     ratingCount: { type: Number, default: 0 },
     image: { type: String, default: "" },

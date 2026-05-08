@@ -21,6 +21,11 @@
         <div class="info-table">
           <div class="info-row">
             <span class="label">Author:</span>
+            <span>{{ product.author }}</span>
+          </div>
+
+          <div class="info-row">
+            <span class="label">Distributor:</span>
             <span>{{ product.distributor }}</span>
           </div>
 

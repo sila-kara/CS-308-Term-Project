@@ -61,7 +61,7 @@
     <div class="product-info">
       <p class="product-category">{{ product.category }}</p>
       <h3 class="product-name">{{ product.name }}</h3>
-      <p class="product-author">Author: {{ product.distributor }}</p>
+      <p class="product-author">Author: {{ product.author }}</p>
 
       <div class="rating-row">
         <div class="stars">
