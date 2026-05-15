@@ -31,32 +31,45 @@
         </div>
 
         <div class="return-info">
-          <p v-if="order.returnItems?.length"><strong>Requested items:</strong> {{ order.returnItems.join(", ") }}</p>
+          <p v-if="selectedItems(order).length"><strong>Requested items:</strong> {{ selectedItems(order).map(item => item.name).join(", ") }}</p>
           <p v-if="order.returnReason"><strong>Reason:</strong> {{ order.returnReason }}</p>
+          <p><strong>Refund amount:</strong> {{ refundAmount(order).toFixed(2) }} TL</p>
           <p><strong>Refund basis:</strong> original purchase price stored on the order.</p>
           <img v-if="order.returnPhoto" :src="order.returnPhoto" class="return-photo" alt="Return request photo" />
         </div>
 
-        <div v-if="order.returnStatus === 'requested'" class="actions">
-          <button class="btn approve" :disabled="busy[order._id]" @click="approveReturn(order)">
-            Approve refund
-          </button>
-          <div class="reject-group">
-            <input v-model="rejectReasons[order._id]" placeholder="Rejection reason" class="reject-input" />
-            <button
-              class="btn reject"
-              :disabled="busy[order._id] || !rejectReasons[order._id]?.trim()"
-              @click="rejectReturn(order)"
-            >
-              Reject
+        <template v-if="order.returnStatus === 'requested'">
+          <div class="actions">
+            <button class="btn approve" :disabled="busy[order._id]" @click="approveReturn(order)">
+              Approve request
+            </button>
+            <div class="reject-group">
+              <input v-model="rejectReasons[order._id]" placeholder="Rejection reason" class="reject-input" />
+              <button
+                class="btn reject"
+                :disabled="busy[order._id] || !rejectReasons[order._id]?.trim()"
+                @click="rejectReturn(order)"
+              >
+                Reject
+              </button>
+            </div>
+          </div>
+        </template>
+        <template v-else-if="order.returnStatus === 'approved'">
+          <p class="status-note approved">
+            Request approved. Mark it refunded after the returned items arrive.
+          </p>
+          <div class="actions">
+            <button class="btn approve" :disabled="busy[order._id]" @click="markRefunded(order)">
+              Mark refunded
             </button>
           </div>
-        </div>
-        <p v-else-if="order.returnStatus === 'approved'" class="status-note approved">
-          Refund request approved. Final refunded status will be handled in the next increment.
-        </p>
+        </template>
         <p v-else-if="order.returnStatus === 'rejected'" class="status-note rejected">
           Rejected{{ order.returnRejectionReason ? `: ${order.returnRejectionReason}` : "" }}
+        </p>
+        <p v-else-if="order.returnStatus === 'refunded'" class="status-note refunded">
+          Refunded {{ refundAmount(order).toFixed(2) }} TL and restored selected item stock.
         </p>
       </article>
     </div>
@@ -76,8 +89,16 @@ const rejectReasons = reactive({});
 
 function selectedItems(order) {
   if (!order.returnItems?.length) return order.items || [];
-  const requested = new Set(order.returnItems);
-  return (order.items || []).filter((item) => requested.has(item.name));
+  const requested = new Set(order.returnItems.map((item) => String(item)));
+  return (order.items || []).filter((item) => {
+    const productId = String(item.productId || item.id || item._id || "");
+    return requested.has(productId) || requested.has(item.name);
+  });
+}
+
+function refundAmount(order) {
+  if (Number(order.returnRefundAmount) > 0) return Number(order.returnRefundAmount);
+  return selectedItems(order).reduce((sum, item) => sum + item.price * item.quantity, 0);
 }
 
 async function loadRefunds() {
@@ -114,6 +135,18 @@ async function rejectReturn(order) {
     replaceOrder(data);
   } catch (e) {
     alert(e.response?.data?.message || "Failed to reject refund.");
+  } finally {
+    busy[order._id] = false;
+  }
+}
+
+async function markRefunded(order) {
+  busy[order._id] = true;
+  try {
+    const { data } = await api.patch(`/orders/${order._id}/return/refund`);
+    replaceOrder(data);
+  } catch (e) {
+    alert(e.response?.data?.message || "Failed to mark refund as completed.");
   } finally {
     busy[order._id] = false;
   }
@@ -207,6 +240,7 @@ h1 {
 .return-badge.requested { background: #fef3c7; color: #92400e; }
 .return-badge.approved { background: #d1fae5; color: #065f46; }
 .return-badge.rejected { background: #fee2e2; color: #991b1b; }
+.return-badge.refunded { background: #dbeafe; color: #1e40af; }
 .meta {
   display: flex;
   align-items: center;
@@ -297,5 +331,9 @@ h1 {
 .status-note.rejected {
   background: #fef2f2;
   color: #991b1b;
+}
+.status-note.refunded {
+  background: #eff6ff;
+  color: #1e40af;
 }
 </style>

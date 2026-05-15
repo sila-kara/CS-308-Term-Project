@@ -2,7 +2,7 @@ const router = require("express").Router();
 const {
   createOrder, getOrdersByUser, getOrderById,
   advanceStatus, getAllOrders, requestReturn,
-  approveReturn, rejectReturn, cancelOrder, getRefundRequests,
+  approveReturn, rejectReturn, refundReturn, cancelOrder, getRefundRequests,
 } = require("../controllers/orderController");
 const { authMiddleware, requireRole } = require("../middleware/auth");
 
@@ -18,5 +18,6 @@ router.post("/:id/return", requestReturn);
 router.patch("/:id/cancel", cancelOrder);
 router.patch("/:id/return/approve", requireRole("sales_manager"), approveReturn);
 router.patch("/:id/return/reject", requireRole("sales_manager"), rejectReturn);
+router.patch("/:id/return/refund", requireRole("sales_manager"), refundReturn);
 
 module.exports = router;

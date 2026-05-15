@@ -19,6 +19,26 @@ function randomCargoCode() {
   return { company: company.name, code: `${company.prefix}${digits}` };
 }
 
+function normalizeReturnSelection(returnItems) {
+  if (!Array.isArray(returnItems)) return [];
+  return [...new Set(returnItems.map((item) => String(item || "").trim()).filter(Boolean))];
+}
+
+function getSelectedReturnItems(order) {
+  const selected = new Set(normalizeReturnSelection(order.returnItems));
+  if (selected.size === 0) return [];
+
+  return order.items.filter((item) => {
+    const productId = item.productId?.toString();
+    return selected.has(productId) || selected.has(item.name);
+  });
+}
+
+function calculateRefundAmount(items) {
+  const amount = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  return Math.round(amount * 100) / 100;
+}
+
 exports.createOrder = async (req, res) => {
   try {
     const { items, subtotal, shipping, tax, total, paymentMethod, cardLast4, deliveryAddress } = req.body;
@@ -167,12 +187,27 @@ exports.requestReturn = async (req, res) => {
       return res.status(400).json({ message: "Return window has expired (30 days)." });
 
     const { returnItems, returnReason, returnPhoto } = req.body;
+    const selectedReturnItems = normalizeReturnSelection(returnItems);
+    if (selectedReturnItems.length === 0) {
+      return res.status(400).json({ message: "Select at least one item to return." });
+    }
+
+    const selected = new Set(selectedReturnItems);
+    const hasValidSelection = order.items.some((item) => {
+      const productId = item.productId?.toString();
+      return selected.has(productId) || selected.has(item.name);
+    });
+
+    if (!hasValidSelection) {
+      return res.status(400).json({ message: "Selected return items are not in this order." });
+    }
+
     const { company, code } = randomCargoCode();
 
     order.returnStatus = "requested";
     order.returnCargoCode = code;
     order.returnCargoCompany = company;
-    order.returnItems = returnItems || [];
+    order.returnItems = selectedReturnItems;
     order.returnReason = returnReason || "";
     order.returnPhoto = returnPhoto || null;
     order.returnRequestedAt = new Date();
@@ -191,19 +226,19 @@ exports.approveReturn = async (req, res) => {
     if (order.returnStatus !== "requested")
       return res.status(400).json({ message: "No pending return request." });
 
+    const returnedItems = getSelectedReturnItems(order);
+    if (returnedItems.length === 0)
+      return res.status(400).json({ message: "No valid returned items selected." });
+
     order.returnStatus = "approved";
+    order.returnApprovedAt = new Date();
+    order.returnRefundAmount = calculateRefundAmount(returnedItems);
     await order.save();
     await order.populate("userId", "name email");
 
-    // Restore stock for returned items
-    for (const item of order.items) {
-      await Product.findByIdAndUpdate(item.productId, { $inc: { quantity: item.quantity } });
-    }
-
     try {
-      const User = require("../models/User");
-      const user = await User.findById(order.userId);
-      if (user) await sendReturnEmail(user.email, order, user.name, "approved");
+      const user = order.userId;
+      if (user?.email) await sendReturnEmail(user.email, order, user.name, "approved");
     } catch (e) { console.error("Return approval email error:", e.message); }
 
     res.json(order);
@@ -226,10 +261,36 @@ exports.rejectReturn = async (req, res) => {
     await order.populate("userId", "name email");
 
     try {
-      const User = require("../models/User");
-      const user = await User.findById(order.userId);
-      if (user) await sendReturnEmail(user.email, order, user.name, "rejected", rejectionReason);
+      const user = order.userId;
+      if (user?.email) await sendReturnEmail(user.email, order, user.name, "rejected", rejectionReason);
     } catch (e) { console.error("Return rejection email error:", e.message); }
+
+    res.json(order);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.refundReturn = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ message: "Order not found" });
+    if (order.returnStatus !== "approved")
+      return res.status(400).json({ message: "Only approved returns can be refunded." });
+
+    const returnedItems = getSelectedReturnItems(order);
+    if (returnedItems.length === 0)
+      return res.status(400).json({ message: "No valid returned items selected." });
+
+    for (const item of returnedItems) {
+      await Product.findByIdAndUpdate(item.productId, { $inc: { quantity: item.quantity } });
+    }
+
+    order.returnStatus = "refunded";
+    order.returnRefundAmount = order.returnRefundAmount || calculateRefundAmount(returnedItems);
+    order.returnRefundedAt = new Date();
+    await order.save();
+    await order.populate("userId", "name email");
 
     res.json(order);
   } catch (err) {

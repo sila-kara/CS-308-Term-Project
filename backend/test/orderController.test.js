@@ -4,7 +4,11 @@ const test = require("node:test");
 const Order = require("../models/Order");
 const Product = require("../models/Product");
 const User = require("../models/User");
-const { createOrder } = require("../controllers/orderController");
+const {
+  createOrder,
+  approveReturn,
+  refundReturn,
+} = require("../controllers/orderController");
 
 function makeRes() {
   return {
@@ -146,5 +150,97 @@ test("createOrder decrements stock and creates a processing order", async () => 
   assert.equal(res.body.userId, "user-1");
   assert.deepEqual(stockUpdates, [
     ["product-1", { $inc: { quantity: -2 } }],
+  ]);
+});
+
+function makeReturnOrder(overrides = {}) {
+  return {
+    _id: "order-1",
+    userId: "user-1",
+    returnStatus: "requested",
+    returnItems: ["product-1"],
+    items: [
+      {
+        productId: "product-1",
+        name: "Clean Code",
+        price: 200,
+        quantity: 2,
+      },
+      {
+        productId: "product-2",
+        name: "1984",
+        price: 65,
+        quantity: 1,
+      },
+    ],
+    async save() {
+      this.saved = true;
+      return this;
+    },
+    async populate() {
+      return this;
+    },
+    ...overrides,
+  };
+}
+
+test("approveReturn approves selected items and does not restore stock yet", async () => {
+  const originalFindById = Order.findById;
+  const originalFindByIdAndUpdate = Product.findByIdAndUpdate;
+
+  const order = makeReturnOrder();
+  const stockUpdates = [];
+  Order.findById = async () => order;
+  Product.findByIdAndUpdate = async (...args) => {
+    stockUpdates.push(args);
+  };
+
+  const req = { params: { id: "order-1" } };
+  const res = makeRes();
+
+  try {
+    await approveReturn(req, res);
+  } finally {
+    Order.findById = originalFindById;
+    Product.findByIdAndUpdate = originalFindByIdAndUpdate;
+  }
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.returnStatus, "approved");
+  assert.equal(res.body.returnRefundAmount, 400);
+  assert.ok(res.body.returnApprovedAt);
+  assert.deepEqual(stockUpdates, []);
+});
+
+test("refundReturn restores stock only for selected returned items", async () => {
+  const originalFindById = Order.findById;
+  const originalFindByIdAndUpdate = Product.findByIdAndUpdate;
+
+  const order = makeReturnOrder({
+    returnStatus: "approved",
+    returnRefundAmount: 400,
+  });
+  const stockUpdates = [];
+  Order.findById = async () => order;
+  Product.findByIdAndUpdate = async (...args) => {
+    stockUpdates.push(args);
+  };
+
+  const req = { params: { id: "order-1" } };
+  const res = makeRes();
+
+  try {
+    await refundReturn(req, res);
+  } finally {
+    Order.findById = originalFindById;
+    Product.findByIdAndUpdate = originalFindByIdAndUpdate;
+  }
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.returnStatus, "refunded");
+  assert.equal(res.body.returnRefundAmount, 400);
+  assert.ok(res.body.returnRefundedAt);
+  assert.deepEqual(stockUpdates, [
+    ["product-1", { $inc: { quantity: 2 } }],
   ]);
 });

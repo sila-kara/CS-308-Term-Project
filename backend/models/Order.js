@@ -31,6 +31,9 @@ const orderSchema = new mongoose.Schema({
   returnReason: { type: String, default: "" },
   returnPhoto: { type: String, default: null },
   returnRequestedAt: { type: Date, default: null },
+  returnApprovedAt: { type: Date, default: null },
+  returnRefundedAt: { type: Date, default: null },
+  returnRefundAmount: { type: Number, min: 0, default: 0 },
 }, { timestamps: true });
 
 // Auto-generate invoice number before saving
