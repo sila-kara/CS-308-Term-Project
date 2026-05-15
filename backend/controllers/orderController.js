@@ -76,6 +76,17 @@ exports.getAllOrders = async (req, res) => {
   }
 };
 
+exports.getRefundRequests = async (req, res) => {
+  try {
+    const orders = await Order.find({ returnStatus: { $ne: null } })
+      .sort({ returnRequestedAt: -1, createdAt: -1 })
+      .populate("userId", "name email");
+    res.json(orders);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 exports.getOrderById = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
@@ -182,6 +193,7 @@ exports.approveReturn = async (req, res) => {
 
     order.returnStatus = "approved";
     await order.save();
+    await order.populate("userId", "name email");
 
     // Restore stock for returned items
     for (const item of order.items) {
@@ -211,6 +223,7 @@ exports.rejectReturn = async (req, res) => {
     order.returnStatus = "rejected";
     order.returnRejectionReason = rejectionReason || "";
     await order.save();
+    await order.populate("userId", "name email");
 
     try {
       const User = require("../models/User");
