@@ -9,6 +9,8 @@ import OrdersView from "../views/OrdersView.vue";
 import OrderDetailView from "../views/OrderDetailView.vue";
 import AdminReviewsView from "../views/AdminReviewsView.vue";
 import AdminOrdersView from "../views/AdminOrdersView.vue";
+import SalesDashboardView from "../views/SalesDashboardView.vue";
+import SalesRefundsView from "../views/SalesRefundsView.vue";
 import WishlistView from "../views/WishlistView.vue";
 import DealsView from "../views/DealsView.vue";
 import ShippingView from "../views/ShippingView.vue";
@@ -83,12 +85,25 @@ const router = createRouter({
       path: "/admin/reviews",
       name: "admin-reviews",
       component: AdminReviewsView,
+      meta: { requiresAuth: true, roles: ["product_manager"] },
     },
     {
       path: "/admin/orders",
       name: "admin-orders",
       component: AdminOrdersView,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, roles: ["product_manager"] },
+    },
+    {
+      path: "/sales",
+      name: "sales-dashboard",
+      component: SalesDashboardView,
+      meta: { requiresAuth: true, roles: ["sales_manager"] },
+    },
+    {
+      path: "/sales/refunds",
+      name: "sales-refunds",
+      component: SalesRefundsView,
+      meta: { requiresAuth: true, roles: ["sales_manager"] },
     },
     { path: "/shipping", name: "shipping", component: ShippingView },
     { path: "/returns", name: "returns", component: ReturnsView },
@@ -100,13 +115,22 @@ const router = createRouter({
   ],
 });
 
+function homeForRole(role) {
+  if (role === "product_manager") return "/admin/orders";
+  if (role === "sales_manager") return "/sales";
+  return "/";
+}
+
 router.beforeEach((to) => {
-  const { isLoggedIn } = useAuthStore();
+  const { state, isLoggedIn } = useAuthStore();
   if (to.meta.requiresAuth && !isLoggedIn.value) {
     return {
       path: "/login",
       query: { redirect: to.fullPath },
     };
+  }
+  if (to.meta.roles?.length && !to.meta.roles.includes(state.user?.role)) {
+    return homeForRole(state.user?.role);
   }
   return true;
 });

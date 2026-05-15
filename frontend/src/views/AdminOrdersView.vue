@@ -1,6 +1,7 @@
 <template>
   <div class="admin-page">
-    <h1>Order Management</h1>
+    <h1>Delivery Management</h1>
+    <p class="lead">Track paid orders, delivery addresses, and shipment status. Refund decisions are handled in the Sales Manager panel.</p>
 
     <div v-if="loading" class="skeleton-list">
       <div v-for="n in 5" :key="n" class="skeleton-card">
@@ -28,9 +29,6 @@
           <div>
             <span class="inv">{{ order.invoiceNumber }}</span>
             <span :class="['status-badge', order.status]">{{ order.status }}</span>
-            <span v-if="order.returnStatus" :class="['return-badge', order.returnStatus]">
-              return: {{ order.returnStatus }}
-            </span>
           </div>
           <div class="meta">
             <span>{{ order.userId?.name || "—" }}</span>
@@ -45,31 +43,6 @@
           <span v-for="(item, i) in order.items" :key="i" class="item-chip">
             {{ item.name }} ×{{ item.quantity }}
           </span>
-        </div>
-
-        <!-- Return info -->
-        <div v-if="order.returnStatus" class="return-info">
-          <div class="return-top">
-            <span>📦 <strong>{{ order.returnCargoCompany }}</strong> — <code>{{ order.returnCargoCode }}</code></span>
-            <span v-if="order.returnItems?.length" class="return-items">Items: {{ order.returnItems.join(", ") }}</span>
-            <span v-if="order.returnReason" class="return-reason">Reason: {{ order.returnReason }}</span>
-            <img v-if="order.returnPhoto" :src="order.returnPhoto" class="return-photo" alt="Return photo" />
-          </div>
-
-          <!-- Pending: approve / reject -->
-          <div v-if="order.returnStatus === 'requested'" class="return-actions">
-            <button class="btn approve-btn" :disabled="returning[order._id]" @click="approveReturn(order)">
-              ✅ Approve return
-            </button>
-            <div class="reject-group">
-              <input v-model="rejectReasons[order._id]" placeholder="Rejection reason…" class="reject-input" />
-              <button class="btn reject-btn" :disabled="returning[order._id] || !rejectReasons[order._id]?.trim()" @click="rejectReturn(order)">
-                ❌ Reject
-              </button>
-            </div>
-          </div>
-          <div v-else-if="order.returnStatus === 'approved'" class="status-tag approved">✅ Return approved</div>
-          <div v-else-if="order.returnStatus === 'rejected'" class="status-tag rejected">❌ Rejected — {{ order.returnRejectionReason }}</div>
         </div>
 
         <!-- Actions -->
@@ -99,8 +72,6 @@ const orders = ref([]);
 const loading = ref(false);
 const error = ref("");
 const advancing = reactive({});
-const returning = reactive({});
-const rejectReasons = reactive({});
 const activeTab = ref("all");
 
 const STATUS_NEXT = { processing: "in-transit", "in-transit": "delivered" };
@@ -112,18 +83,15 @@ const tabs = [
   { label: "In Transit", value: "in-transit" },
   { label: "Delivered", value: "delivered" },
   { label: "Cancelled", value: "cancelled" },
-  { label: "Return Requests", value: "returns" },
 ];
 
 const filteredOrders = computed(() => {
   if (activeTab.value === "all") return orders.value;
-  if (activeTab.value === "returns") return orders.value.filter(o => o.returnStatus === "requested");
   return orders.value.filter(o => o.status === activeTab.value);
 });
 
 function countFor(tab) {
   if (tab === "all") return orders.value.length;
-  if (tab === "returns") return orders.value.filter(o => o.returnStatus === "requested").length;
   return orders.value.filter(o => o.status === tab).length;
 }
 
@@ -150,34 +118,6 @@ async function advance(order) {
     alert(e.response?.data?.message || "Failed to update status.");
   } finally {
     advancing[order._id] = false;
-  }
-}
-
-async function approveReturn(order) {
-  returning[order._id] = true;
-  try {
-    const { data } = await api.patch(`/orders/${order._id}/return/approve`);
-    const idx = orders.value.findIndex(o => o._id === order._id);
-    if (idx !== -1) orders.value[idx] = data;
-  } catch (e) {
-    alert(e.response?.data?.message || "Failed to approve return.");
-  } finally {
-    returning[order._id] = false;
-  }
-}
-
-async function rejectReturn(order) {
-  returning[order._id] = true;
-  try {
-    const { data } = await api.patch(`/orders/${order._id}/return/reject`, {
-      rejectionReason: rejectReasons[order._id] || "",
-    });
-    const idx = orders.value.findIndex(o => o._id === order._id);
-    if (idx !== -1) orders.value[idx] = data;
-  } catch (e) {
-    alert(e.response?.data?.message || "Failed to reject return.");
-  } finally {
-    returning[order._id] = false;
   }
 }
 
@@ -220,6 +160,7 @@ onMounted(loadOrders);
   color: #0f172a;
 }
 h1 { font-size: 1.8rem; margin: 0 0 24px; }
+.lead { margin: -14px 0 22px; color: #64748b; font-size: 0.92rem; }
 
 .tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
 .tab {

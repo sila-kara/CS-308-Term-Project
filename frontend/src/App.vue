@@ -1,17 +1,18 @@
 <template>
   <div class="app">
     <AdminNav v-if="isAdminRoute" />
+    <SalesManagerNav v-else-if="isSalesRoute" />
     <template v-else>
       <Navbar />
     </template>
     <main class="main-content">
       <router-view v-slot="{ Component, route }">
-        <keep-alive :include="['AdminOrdersView', 'AdminReviewsView']">
+        <keep-alive :include="['AdminOrdersView', 'AdminReviewsView', 'SalesDashboardView', 'SalesRefundsView']">
           <component :is="Component" :key="route.path" />
         </keep-alive>
       </router-view>
     </main>
-    <Footer v-if="!isAdminRoute" />
+    <Footer v-if="!isAdminRoute && !isSalesRoute" />
   </div>
 </template>
 
@@ -20,6 +21,7 @@ import { computed, onMounted, watch } from "vue";
 import { useRoute } from "vue-router";
 import Navbar from "./components/Navbar.vue";
 import AdminNav from "./components/AdminNav.vue";
+import SalesManagerNav from "./components/SalesManagerNav.vue";
 import Footer from "./components/Footer.vue";
 import { useWishlistStore } from "./stores/wishlist";
 import { useAuthStore } from "./stores/auth";
@@ -27,6 +29,7 @@ import { useProductsStore } from "./stores/products";
 
 const route = useRoute();
 const isAdminRoute = computed(() => route.path.startsWith("/admin"));
+const isSalesRoute = computed(() => route.path.startsWith("/sales"));
 
 const { loadWishlist } = useWishlistStore();
 const { state: authState } = useAuthStore();

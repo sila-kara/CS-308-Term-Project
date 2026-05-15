@@ -62,6 +62,10 @@ async function onSubmit() {
     router.push("/admin/orders");
     return;
   }
+  if (state.user?.role === "sales_manager") {
+    router.push("/sales");
+    return;
+  }
   const redirect = route.query.redirect;
   router.push(typeof redirect === "string" ? redirect : "/");
 }

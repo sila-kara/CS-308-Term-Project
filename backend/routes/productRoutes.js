@@ -9,7 +9,12 @@ const { authMiddleware, requireRole } = require("../middleware/auth");
 
 router.get("/", getProducts);
 router.get("/:id", getProductById);
-router.post("/", createProduct);
+router.post(
+  "/",
+  authMiddleware,
+  requireRole("product_manager"),
+  createProduct
+);
 router.patch(
   "/:id/stock",
   authMiddleware,
