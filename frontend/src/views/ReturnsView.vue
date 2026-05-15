@@ -44,7 +44,7 @@
             <p class="select-label">Select items to return:</p>
             <div v-for="(item, i) in order.items" :key="i" class="item-row">
               <label>
-                <input type="checkbox" :value="item.name" v-model="selected[order._id]" />
+                <input type="checkbox" :value="returnItemValue(item)" v-model="selected[order._id]" />
                 {{ item.name }} × {{ item.quantity }}
               </label>
             </div>
@@ -138,6 +138,10 @@ async function submitReturn(order) {
   } finally {
     submitting[order._id] = false;
   }
+}
+
+function returnItemValue(item) {
+  return String(item.productId || item.id || item._id || item.name);
 }
 
 function formatDate(d) {

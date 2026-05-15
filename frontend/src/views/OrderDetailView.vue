@@ -73,7 +73,7 @@
           <label class="field-label">Items to return</label>
           <div v-for="(item, i) in order.items" :key="i" class="item-check">
             <label>
-              <input type="checkbox" :value="item.name" v-model="returnItems" />
+              <input type="checkbox" :value="returnItemValue(item)" v-model="returnItems" />
               {{ item.name }} ×{{ item.quantity }}
             </label>
           </div>
@@ -86,7 +86,7 @@
           <img v-if="photoPreview" :src="photoPreview" class="photo-preview" />
 
           <p v-if="returnError" class="err">{{ returnError }}</p>
-          <button class="btn primary" :disabled="returnSubmitting || !returnReason.trim()" @click="submitReturn">
+          <button class="btn primary" :disabled="returnSubmitting || !returnReason.trim() || returnItems.length === 0" @click="submitReturn">
             {{ returnSubmitting ? "Submitting…" : "Request Return" }}
           </button>
         </div>
@@ -156,10 +156,18 @@ function onPhoto(e) {
   reader.readAsDataURL(file);
 }
 
+function returnItemValue(item) {
+  return String(item.productId || item.id || item._id || item.name);
+}
+
 async function submitReturn() {
   returnError.value = "";
   if (!returnReason.value.trim()) {
     returnError.value = "Please enter a reason.";
+    return;
+  }
+  if (returnItems.value.length === 0) {
+    returnError.value = "Please select at least one item.";
     return;
   }
   returnSubmitting.value = true;
