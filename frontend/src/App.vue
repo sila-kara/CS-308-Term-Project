@@ -7,7 +7,7 @@
     </template>
     <main class="main-content">
       <router-view v-slot="{ Component, route }">
-        <keep-alive :include="['AdminOrdersView', 'AdminReviewsView', 'SalesDashboardView', 'SalesRefundsView']">
+        <keep-alive :include="['AdminOrdersView', 'AdminReviewsView', 'SalesDashboardView', 'SalesPricingView', 'SalesRefundsView']">
           <component :is="Component" :key="route.path" />
         </keep-alive>
       </router-view>

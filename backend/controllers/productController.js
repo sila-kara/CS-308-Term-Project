@@ -1,5 +1,26 @@
 const Product = require("../models/Product");
 
+function roundMoney(value) {
+  return Math.round(value * 100) / 100;
+}
+
+function isDiscountActive(product, now = new Date()) {
+  if (!product || !product.discountRate || !product.discountedPrice) return false;
+  if (product.discountStartDate && new Date(product.discountStartDate) > now) return false;
+  if (product.discountEndDate && new Date(product.discountEndDate) < now) return false;
+  return true;
+}
+
+function withPricingView(product) {
+  const plain = typeof product.toObject === "function" ? product.toObject() : product;
+  const active = isDiscountActive(plain);
+  return {
+    ...plain,
+    isDiscountActive: active,
+    effectivePrice: active ? plain.discountedPrice : plain.price,
+  };
+}
+
 exports.getProducts = async (req, res) => {
   try {
     const { search, category, sort } = req.query;
@@ -28,7 +49,7 @@ exports.getProducts = async (req, res) => {
       .populate("category")
       .sort(sortOption);
 
-    res.json(products);
+    res.json(products.map(withPricingView));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -42,7 +63,77 @@ exports.getProductById = async (req, res) => {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    res.json(product);
+    res.json(withPricingView(product));
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.updatePricing = async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    const {
+      price,
+      cost,
+      discountRate,
+      discountStartDate,
+      discountEndDate,
+    } = req.body;
+
+    if (price == null || Number(price) < 0) {
+      return res.status(400).json({ message: "Valid price required" });
+    }
+
+    const numericPrice = roundMoney(Number(price));
+    const numericCost = cost == null || cost === "" ? 0 : roundMoney(Number(cost));
+    const numericDiscountRate =
+      discountRate == null || discountRate === "" ? 0 : Number(discountRate);
+
+    if (Number.isNaN(numericCost) || numericCost < 0) {
+      return res.status(400).json({ message: "Valid cost required" });
+    }
+
+    if (
+      Number.isNaN(numericDiscountRate) ||
+      numericDiscountRate < 0 ||
+      numericDiscountRate > 100
+    ) {
+      return res.status(400).json({ message: "Discount rate must be between 0 and 100" });
+    }
+
+    const startDate = discountStartDate ? new Date(discountStartDate) : null;
+    const endDate = discountEndDate ? new Date(discountEndDate) : null;
+
+    if (startDate && Number.isNaN(startDate.getTime())) {
+      return res.status(400).json({ message: "Invalid discount start date" });
+    }
+
+    if (endDate && Number.isNaN(endDate.getTime())) {
+      return res.status(400).json({ message: "Invalid discount end date" });
+    }
+
+    if (startDate && endDate && startDate > endDate) {
+      return res.status(400).json({ message: "Discount start date must be before end date" });
+    }
+
+    product.price = numericPrice;
+    product.cost = numericCost;
+    product.discountRate = numericDiscountRate;
+    product.discountedPrice =
+      numericDiscountRate > 0
+        ? roundMoney(numericPrice * (1 - numericDiscountRate / 100))
+        : null;
+    product.discountStartDate = startDate;
+    product.discountEndDate = endDate;
+
+    await product.save();
+    await product.populate("category");
+
+    res.json(withPricingView(product));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

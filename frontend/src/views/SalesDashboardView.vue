@@ -12,11 +12,11 @@
         <strong>Review customer return requests</strong>
         <span class="hint">Approve or reject refund requests submitted within the return window.</span>
       </router-link>
-      <div class="action-card muted">
+      <router-link class="action-card" to="/sales/pricing">
         <span class="label">Pricing & Discounts</span>
-        <strong>Coming next</strong>
-        <span class="hint">Set product prices and persistent discount campaigns.</span>
-      </div>
+        <strong>Set product prices and discounts</strong>
+        <span class="hint">Update list price, cost, discount rate, and campaign dates.</span>
+      </router-link>
       <div class="action-card muted">
         <span class="label">Invoices & Reports</span>
         <strong>Coming later</strong>

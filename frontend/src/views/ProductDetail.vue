@@ -47,7 +47,11 @@
         </div>
 
         <div class="price-section">
-          <span class="price">{{ product.price.toFixed(2) }} TL</span>
+          <div class="detail-price-block">
+            <span class="price">{{ displayPrice.toFixed(2) }} TL</span>
+            <span v-if="hasDiscount" class="list-price">{{ product.price.toFixed(2) }} TL</span>
+            <span v-if="hasDiscount" class="discount-rate">%{{ Math.round(product.discountRate) }} off</span>
+          </div>
 
           <button
             v-if="product.quantity > 0"
@@ -155,6 +159,7 @@ import { useCartStore } from "../stores/cart";
 import { useAuthStore } from "../stores/auth";
 import { useCommentsStore } from "../stores/comments";
 import { useWishlistStore } from "../stores/wishlist";
+import { effectivePrice, isOnSale } from "../utils/productUtils";
 
 const route = useRoute();
 const router = useRouter();
@@ -173,6 +178,8 @@ const isWishlisted = computed(() => product.value ? isInWishlist(product.value._
 
 const product = ref(null);
 const myReview = ref(null);
+const hasDiscount = computed(() => isOnSale(product.value));
+const displayPrice = computed(() => effectivePrice(product.value));
 
 const approvedReviews = computed(() =>
   product.value ? listApprovedForProduct(product.value._id || product.value.id) : [],
@@ -389,10 +396,32 @@ async function submitReview() {
   border-top: 1px solid #e2e8f0;
 }
 
+.detail-price-block {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .price {
   font-size: 2.1rem;
   font-weight: bold;
   color: #16a34a;
+}
+
+.list-price {
+  color: #64748b;
+  text-decoration: line-through;
+  font-weight: 700;
+}
+
+.discount-rate {
+  background: #dcfce7;
+  color: #166534;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.78rem;
+  font-weight: 800;
 }
 
 .add-to-cart-btn {

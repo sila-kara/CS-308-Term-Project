@@ -245,6 +245,51 @@ test("createOrder rolls back stock when an atomic decrement fails", async () => 
   ]);
 });
 
+test("createOrder uses active discounted DB price at checkout", async () => {
+  const originalFindById = Product.findById;
+  const originalFindOneAndUpdate = Product.findOneAndUpdate;
+  const originalFindByIdAndUpdate = Product.findByIdAndUpdate;
+  const originalCreate = Order.create;
+  const originalUserFindById = User.findById;
+
+  Product.findById = async (id) => ({
+    _id: id,
+    name: "Clean Code",
+    quantity: 5,
+    price: 200,
+    discountRate: 20,
+    discountedPrice: 160,
+    discountStartDate: new Date(Date.now() - 1000),
+    discountEndDate: new Date(Date.now() + 1000 * 60 * 60),
+  });
+  Product.findOneAndUpdate = async () => ({ _id: "product-1", quantity: 3 });
+  Product.findByIdAndUpdate = async () => {};
+  User.findById = async () => null;
+  Order.create = async (payload) => ({
+    _id: "order-1",
+    ...payload,
+  });
+
+  const req = { user: { id: "user-1" }, body: makeOrderBody() };
+  const res = makeRes();
+
+  try {
+    await createOrder(req, res);
+  } finally {
+    Product.findById = originalFindById;
+    Product.findOneAndUpdate = originalFindOneAndUpdate;
+    Product.findByIdAndUpdate = originalFindByIdAndUpdate;
+    Order.create = originalCreate;
+    User.findById = originalUserFindById;
+  }
+
+  assert.equal(res.statusCode, 201);
+  assert.equal(res.body.items[0].price, 160);
+  assert.equal(res.body.subtotal, 320);
+  assert.equal(res.body.tax, 32);
+  assert.equal(res.body.total, 352);
+});
+
 function makeReturnOrder(overrides = {}) {
   return {
     _id: "order-1",
