@@ -17,21 +17,16 @@ async function fetchOrders() {
 }
 
 async function createOrder(payload) {
-  const { items, subtotal, tax, total, paymentMethod, cardLast4, deliveryAddress } = payload;
+  const { items, paymentMethod, cardLast4, deliveryAddress } = payload;
 
   // Map cart items → backend format (productId = MongoDB _id)
   const backendItems = items.map((item) => ({
     productId: item.id ?? item._id,
-    name: item.name,
-    price: item.price,
     quantity: item.quantity,
   }));
 
   const { data } = await api.post("/orders", {
     items: backendItems,
-    subtotal,
-    tax,
-    total,
     paymentMethod: paymentMethod || "Mock Visa",
     cardLast4: cardLast4 || "****",
     deliveryAddress: deliveryAddress || "",
