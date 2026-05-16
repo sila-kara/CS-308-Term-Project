@@ -3,6 +3,7 @@ const {
   getProducts,
   getProductById,
   createProduct,
+  deleteProduct,
   updatePricing,
   updateStock,
 } = require("../controllers/productController");
@@ -15,6 +16,12 @@ router.post(
   authMiddleware,
   requireRole("product_manager"),
   createProduct
+);
+router.delete(
+  "/:id",
+  authMiddleware,
+  requireRole("product_manager"),
+  deleteProduct
 );
 router.patch(
   "/:id/stock",
