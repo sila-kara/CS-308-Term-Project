@@ -141,10 +141,54 @@ exports.updatePricing = async (req, res) => {
 
 exports.createProduct = async (req, res) => {
   try {
-    const product = await Product.create(req.body);
-    res.status(201).json(product);
+    const {
+      name,
+      model,
+      serialNumber,
+      description,
+      category,
+      quantity,
+      warranty,
+      distributor,
+      author,
+      image,
+    } = req.body;
+
+    const product = await Product.create({
+      name,
+      model,
+      serialNumber,
+      description,
+      category,
+      quantity,
+      warranty,
+      distributor,
+      author,
+      image,
+      price: 0,
+      cost: 0,
+      discountRate: 0,
+      discountedPrice: null,
+      discountStartDate: null,
+      discountEndDate: null,
+    });
+    await product.populate("category");
+    res.status(201).json(withPricingView(product));
   } catch (err) {
     res.status(400).json({ message: err.message });
+  }
+};
+
+exports.deleteProduct = async (req, res) => {
+  try {
+    const product = await Product.findByIdAndDelete(req.params.id);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    res.json({ message: "Product deleted" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 };
 
@@ -166,7 +210,7 @@ exports.updateStock = async (req, res) => {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    res.json(product);
+    res.json(withPricingView(product));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

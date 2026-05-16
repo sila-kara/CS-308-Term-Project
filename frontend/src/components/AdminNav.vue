@@ -6,6 +6,7 @@
       </router-link>
       <div class="links">
         <router-link to="/admin/orders" class="nav-link">Delivery</router-link>
+        <router-link to="/admin/products" class="nav-link">Products & Stock</router-link>
         <router-link to="/admin/reviews" class="nav-link">Review Moderation</router-link>
       </div>
       <div class="right">

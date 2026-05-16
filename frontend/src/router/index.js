@@ -9,6 +9,7 @@ import OrdersView from "../views/OrdersView.vue";
 import OrderDetailView from "../views/OrderDetailView.vue";
 import AdminReviewsView from "../views/AdminReviewsView.vue";
 import AdminOrdersView from "../views/AdminOrdersView.vue";
+import AdminProductsView from "../views/AdminProductsView.vue";
 import SalesDashboardView from "../views/SalesDashboardView.vue";
 import SalesPricingView from "../views/SalesPricingView.vue";
 import SalesRefundsView from "../views/SalesRefundsView.vue";
@@ -92,6 +93,12 @@ const router = createRouter({
       path: "/admin/orders",
       name: "admin-orders",
       component: AdminOrdersView,
+      meta: { requiresAuth: true, roles: ["product_manager"] },
+    },
+    {
+      path: "/admin/products",
+      name: "admin-products",
+      component: AdminProductsView,
       meta: { requiresAuth: true, roles: ["product_manager"] },
     },
     {

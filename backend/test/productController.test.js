@@ -2,7 +2,11 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 
 const Product = require("../models/Product");
-const { updatePricing } = require("../controllers/productController");
+const {
+  createProduct,
+  deleteProduct,
+  updatePricing,
+} = require("../controllers/productController");
 
 function makeRes() {
   return {
@@ -97,4 +101,72 @@ test("updatePricing rejects invalid discount rate", async () => {
 
   assert.equal(res.statusCode, 400);
   assert.deepEqual(res.body, { message: "Discount rate must be between 0 and 100" });
+});
+
+test("createProduct keeps pricing under sales manager control", async () => {
+  const originalCreate = Product.create;
+  let createdPayload;
+
+  Product.create = async (payload) => {
+    createdPayload = payload;
+    return {
+      _id: "product-1",
+      ...payload,
+      toObject() {
+        return { ...this };
+      },
+      async populate() {
+        return this;
+      },
+    };
+  };
+
+  const req = {
+    body: {
+      name: "Clean Code",
+      model: "1st Edition",
+      serialNumber: "ISBN-9780132350884",
+      description: "A handbook of software craftsmanship.",
+      category: "category-1",
+      quantity: 5,
+      price: 200,
+      cost: 120,
+      discountRate: 20,
+      discountedPrice: 160,
+      warranty: "Exchange guarantee",
+      distributor: "Robert C. Martin",
+    },
+  };
+  const res = makeRes();
+
+  try {
+    await createProduct(req, res);
+  } finally {
+    Product.create = originalCreate;
+  }
+
+  assert.equal(res.statusCode, 201);
+  assert.equal(createdPayload.price, 0);
+  assert.equal(createdPayload.cost, 0);
+  assert.equal(createdPayload.discountRate, 0);
+  assert.equal(createdPayload.discountedPrice, null);
+  assert.equal(res.body.price, 0);
+  assert.equal(res.body.effectivePrice, 0);
+});
+
+test("deleteProduct returns a not-found response for missing products", async () => {
+  const originalFindByIdAndDelete = Product.findByIdAndDelete;
+  Product.findByIdAndDelete = async () => null;
+
+  const req = { params: { id: "missing-product" } };
+  const res = makeRes();
+
+  try {
+    await deleteProduct(req, res);
+  } finally {
+    Product.findByIdAndDelete = originalFindByIdAndDelete;
+  }
+
+  assert.equal(res.statusCode, 404);
+  assert.deepEqual(res.body, { message: "Product not found" });
 });

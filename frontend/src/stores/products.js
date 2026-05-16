@@ -12,6 +12,7 @@ function normalize(p) {
   return {
     ...p,
     id: p._id,
+    categoryId: p.category?._id ?? p.category ?? "",
     category: p.category?.name ?? p.category ?? "",
   };
 }
@@ -49,6 +50,39 @@ async function updatePricing(id, payload) {
   return normalized;
 }
 
+async function createProduct(payload) {
+  const { data } = await api.post("/products", payload);
+  const normalized = normalize(data);
+  state.products.unshift(normalized);
+  return normalized;
+}
+
+async function updateStock(id, quantity) {
+  const { data } = await api.patch(`/products/${id}/stock`, { quantity });
+  const normalized = normalize(data);
+  const index = state.products.findIndex((product) => product.id === normalized.id);
+  if (index !== -1) {
+    state.products[index] = normalized;
+  }
+  return normalized;
+}
+
+async function deleteProduct(id) {
+  await api.delete(`/products/${id}`);
+  const index = state.products.findIndex((product) => product.id === id);
+  if (index !== -1) {
+    state.products.splice(index, 1);
+  }
+}
+
 export function useProductsStore() {
-  return { state, fetchProducts, fetchProductById, updatePricing };
+  return {
+    state,
+    fetchProducts,
+    fetchProductById,
+    updatePricing,
+    createProduct,
+    updateStock,
+    deleteProduct,
+  };
 }

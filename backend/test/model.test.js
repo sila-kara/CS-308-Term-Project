@@ -55,6 +55,20 @@ test("Product model accepts sales pricing and discount fields", async () => {
   await assert.doesNotReject(() => product.validate());
 });
 
+test("Product model defaults price to zero for product-manager-created products", async () => {
+  const product = new Product({
+    name: "Clean Code",
+    model: "1st Edition",
+    serialNumber: "ISBN-9780132350884",
+    description: "A handbook of software craftsmanship.",
+    category: new mongoose.Types.ObjectId(),
+    quantity: 5,
+  });
+
+  await assert.doesNotReject(() => product.validate());
+  assert.equal(product.price, 0);
+});
+
 test("User model defaults new users to customer role", () => {
   const user = new User({
     name: "Ada Reader",
