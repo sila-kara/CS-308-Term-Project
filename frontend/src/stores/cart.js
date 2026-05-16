@@ -51,6 +51,10 @@ function addToCart(product) {
   if (!product) return;
 
   const availableStock = product.quantity ?? product.stock ?? 0;
+  const unitPrice =
+    product.isDiscountActive && product.discountedPrice != null
+      ? product.discountedPrice
+      : product.price;
 
   // Guard: product must have stock available
   if (availableStock <= 0) return;
@@ -65,7 +69,7 @@ function addToCart(product) {
     state.items.push({
       id: product.id,
       name: product.name,
-      price: product.price,
+      price: unitPrice,
       image: product.image,
       stock: availableStock,
       quantity: 1,

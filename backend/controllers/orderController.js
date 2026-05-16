@@ -74,6 +74,17 @@ function calculateOrderTotals(items) {
   return { subtotal, shipping, tax, total };
 }
 
+function isDiscountActive(product, now = new Date()) {
+  if (!product || !product.discountRate || !product.discountedPrice) return false;
+  if (product.discountStartDate && new Date(product.discountStartDate) > now) return false;
+  if (product.discountEndDate && new Date(product.discountEndDate) < now) return false;
+  return true;
+}
+
+function getCheckoutPrice(product) {
+  return isDiscountActive(product) ? product.discountedPrice : product.price;
+}
+
 exports.createOrder = async (req, res) => {
   const decrementedItems = [];
 
@@ -100,7 +111,7 @@ exports.createOrder = async (req, res) => {
       orderItems.push({
         productId: item.productId,
         name: product.name,
-        price: product.price,
+        price: getCheckoutPrice(product),
         quantity: item.quantity,
       });
     }

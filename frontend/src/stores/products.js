@@ -39,6 +39,16 @@ async function fetchProductById(id) {
   }
 }
 
+async function updatePricing(id, payload) {
+  const { data } = await api.patch(`/products/${id}/pricing`, payload);
+  const normalized = normalize(data);
+  const index = state.products.findIndex((product) => product.id === normalized.id);
+  if (index !== -1) {
+    state.products[index] = normalized;
+  }
+  return normalized;
+}
+
 export function useProductsStore() {
-  return { state, fetchProducts, fetchProductById };
+  return { state, fetchProducts, fetchProductById, updatePricing };
 }

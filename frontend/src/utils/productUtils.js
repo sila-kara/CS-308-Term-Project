@@ -42,8 +42,16 @@ export function searchProducts(products, query) {
 }
 
 export function isOnSale(product) {
-  const id = String(product?._id || product?.id || "");
-  return !"39f".includes(id.slice(-1));
+  return Boolean(
+    product?.isDiscountActive &&
+      Number(product?.discountRate) > 0 &&
+      Number(product?.discountedPrice) >= 0 &&
+      Number(product?.discountedPrice) < Number(product?.price)
+  );
+}
+
+export function effectivePrice(product) {
+  return isOnSale(product) ? Number(product.discountedPrice) : Number(product?.price || 0);
 }
 
 export function isTopRated(product) {

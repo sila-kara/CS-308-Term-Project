@@ -80,8 +80,9 @@
       </div>
 
       <div class="price-row">
-        <span class="price">{{ product.price.toFixed(2) }} TL</span>
-        <span v-if="hasDiscount" class="list-price">{{ (product.price * 1.18).toFixed(2) }} TL</span>
+        <span class="price">{{ displayPrice.toFixed(2) }} TL</span>
+        <span v-if="hasDiscount" class="list-price">{{ product.price.toFixed(2) }} TL</span>
+        <span v-if="hasDiscount" class="discount-rate">%{{ Math.round(product.discountRate) }} off</span>
       </div>
       <p class="shipping-note">Eligible for free shipping</p>
 
@@ -131,7 +132,7 @@ import { computed, ref } from "vue";
 import { useRouter } from "vue-router";
 import { useCartStore } from "../stores/cart";
 import { useWishlistStore } from "../stores/wishlist";
-import { isOnSale, isTopRated } from "../utils/productUtils";
+import { effectivePrice, isOnSale, isTopRated } from "../utils/productUtils";
 
 const props = defineProps({
   product: {
@@ -148,6 +149,7 @@ const imageFailed = ref(false);
 const isWishlisted = computed(() => isInWishlist(props.product?.id));
 
 const hasDiscount = computed(() => isOnSale(props.product));
+const displayPrice = computed(() => effectivePrice(props.product));
 const placeholderImage =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='1125' viewBox='0 0 900 1125'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23f8fafc'/%3E%3Cstop offset='1' stop-color='%23e2e8f0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='900' height='1125' fill='url(%23g)'/%3E%3Crect x='78' y='92' width='744' height='940' rx='38' fill='%23ffffff' opacity='0.75'/%3E%3Cpath d='M322 390h256c22 0 40 18 40 40v240c0 22-18 40-40 40H322c-22 0-40-18-40-40V430c0-22 18-40 40-40z' fill='%23e2e8f0'/%3E%3Cpath d='M370 520l64 64l44-44l116 116H306l64-64z' fill='%23cbd5e1'/%3E%3Ccircle cx='536' cy='486' r='28' fill='%2394a3b8'/%3E%3Cpath d='M294 786h312' stroke='%23cbd5e1' stroke-width='26' stroke-linecap='round'/%3E%3Cpath d='M294 856h248' stroke='%23e2e8f0' stroke-width='24' stroke-linecap='round'/%3E%3Ctext x='450' y='326' text-anchor='middle' font-family='ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial' font-weight='700' font-size='46' fill='%2364748b'%3ENo image%3C/text%3E%3C/svg%3E";
 
@@ -359,7 +361,7 @@ function onToggleWishlist() {
 .price-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 8px;
 }
@@ -375,6 +377,15 @@ function onToggleWishlist() {
   font-size: 0.76rem;
   color: #64748b;
   text-decoration: line-through;
+}
+
+.discount-rate {
+  background: #dcfce7;
+  color: #166534;
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-size: 0.72rem;
+  font-weight: 800;
 }
 
 .shipping-note {

@@ -36,6 +36,25 @@ test("Product model rejects negative stock", async () => {
   await assert.rejects(() => product.validate(), /Path `quantity` \(-1\) is less than minimum allowed value/);
 });
 
+test("Product model accepts sales pricing and discount fields", async () => {
+  const product = new Product({
+    name: "Clean Code",
+    model: "1st Edition",
+    serialNumber: "ISBN-9780132350884",
+    description: "A handbook of software craftsmanship.",
+    category: new mongoose.Types.ObjectId(),
+    quantity: 5,
+    price: 200,
+    cost: 120,
+    discountRate: 15,
+    discountedPrice: 170,
+    discountStartDate: new Date("2026-05-01"),
+    discountEndDate: new Date("2026-05-31"),
+  });
+
+  await assert.doesNotReject(() => product.validate());
+});
+
 test("User model defaults new users to customer role", () => {
   const user = new User({
     name: "Ada Reader",
