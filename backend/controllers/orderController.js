@@ -5,6 +5,9 @@ const sendStatusEmail = require("../utils/sendStatusEmail");
 const sendReturnEmail = require("../utils/sendReturnEmail");
 
 const STATUS_SEQUENCE = ["processing", "in-transit", "delivered"];
+const SHIPPING_FEE = 29.99;
+const FREE_SHIPPING_THRESHOLD = 250;
+const TAX_RATE = 0.1;
 
 const CARGO_COMPANIES = [
   { name: "Sabancı Kargo",  prefix: "SK" },
@@ -39,28 +42,92 @@ function calculateRefundAmount(items) {
   return Math.round(amount * 100) / 100;
 }
 
+function roundMoney(value) {
+  return Math.round(value * 100) / 100;
+}
+
+function normalizeCheckoutItems(items) {
+  const byProduct = new Map();
+
+  for (const item of items) {
+    const productId = String(item.productId || item.id || item._id || "").trim();
+    const quantity = Number(item.quantity);
+
+    if (!productId || !Number.isInteger(quantity) || quantity <= 0) {
+      return null;
+    }
+
+    byProduct.set(productId, (byProduct.get(productId) || 0) + quantity);
+  }
+
+  return [...byProduct.entries()].map(([productId, quantity]) => ({ productId, quantity }));
+}
+
+function calculateOrderTotals(items) {
+  const subtotal = roundMoney(
+    items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  );
+  const shipping = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
+  const tax = roundMoney(subtotal * TAX_RATE);
+  const total = roundMoney(subtotal + shipping + tax);
+
+  return { subtotal, shipping, tax, total };
+}
+
 exports.createOrder = async (req, res) => {
+  const decrementedItems = [];
+
   try {
-    const { items, subtotal, shipping, tax, total, paymentMethod, cardLast4, deliveryAddress } = req.body;
+    const { items, paymentMethod, cardLast4, deliveryAddress } = req.body;
     const userId = req.user.id;
 
     if (!items || items.length === 0)
       return res.status(400).json({ message: "Order must have at least one item" });
 
-    for (const item of items) {
+    const checkoutItems = normalizeCheckoutItems(items);
+    if (!checkoutItems)
+      return res.status(400).json({ message: "Order items must include valid productId and quantity." });
+
+    const orderItems = [];
+
+    for (const item of checkoutItems) {
       const product = await Product.findById(item.productId);
       if (!product)
         return res.status(404).json({ message: `Product not found: ${item.productId}` });
       if (product.quantity < item.quantity)
         return res.status(400).json({ message: `Insufficient stock for: ${product.name}` });
+
+      orderItems.push({
+        productId: item.productId,
+        name: product.name,
+        price: product.price,
+        quantity: item.quantity,
+      });
     }
 
-    for (const item of items) {
-      await Product.findByIdAndUpdate(item.productId, { $inc: { quantity: -item.quantity } });
+    for (const item of orderItems) {
+      const updated = await Product.findOneAndUpdate(
+        { _id: item.productId, quantity: { $gte: item.quantity } },
+        { $inc: { quantity: -item.quantity } },
+        { new: true }
+      );
+
+      if (!updated) {
+        for (const decremented of decrementedItems) {
+          await Product.findByIdAndUpdate(decremented.productId, {
+            $inc: { quantity: decremented.quantity },
+          });
+        }
+        return res.status(400).json({ message: `Insufficient stock for: ${item.name}` });
+      }
+
+      decrementedItems.push({ productId: item.productId, quantity: item.quantity });
     }
+
+    const { subtotal, shipping, tax, total } = calculateOrderTotals(orderItems);
 
     const order = await Order.create({
-      userId, items, subtotal, shipping: shipping || 0, tax, total,
+      userId, items: orderItems, subtotal, shipping, tax, total,
       paymentMethod, cardLast4, deliveryAddress, status: "processing",
     });
 
@@ -74,6 +141,15 @@ exports.createOrder = async (req, res) => {
 
     res.status(201).json(order);
   } catch (err) {
+    for (const decremented of decrementedItems) {
+      try {
+        await Product.findByIdAndUpdate(decremented.productId, {
+          $inc: { quantity: decremented.quantity },
+        });
+      } catch (rollbackErr) {
+        console.error("Stock rollback error:", rollbackErr.message);
+      }
+    }
     res.status(500).json({ message: err.message });
   }
 };

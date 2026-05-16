@@ -58,11 +58,15 @@ test("createOrder rejects an empty cart", async () => {
 
 test("createOrder rejects checkout when a product cannot be found", async () => {
   const originalFindById = Product.findById;
+  const originalFindOneAndUpdate = Product.findOneAndUpdate;
   const originalFindByIdAndUpdate = Product.findByIdAndUpdate;
   const originalCreate = Order.create;
 
   const stockUpdates = [];
   Product.findById = async () => null;
+  Product.findOneAndUpdate = async (...args) => {
+    stockUpdates.push(args);
+  };
   Product.findByIdAndUpdate = async (...args) => {
     stockUpdates.push(args);
   };
@@ -77,6 +81,7 @@ test("createOrder rejects checkout when a product cannot be found", async () => 
     await createOrder(req, res);
   } finally {
     Product.findById = originalFindById;
+    Product.findOneAndUpdate = originalFindOneAndUpdate;
     Product.findByIdAndUpdate = originalFindByIdAndUpdate;
     Order.create = originalCreate;
   }
@@ -88,11 +93,15 @@ test("createOrder rejects checkout when a product cannot be found", async () => 
 
 test("createOrder rejects checkout when stock is insufficient", async () => {
   const originalFindById = Product.findById;
+  const originalFindOneAndUpdate = Product.findOneAndUpdate;
   const originalFindByIdAndUpdate = Product.findByIdAndUpdate;
   const originalCreate = Order.create;
 
   const stockUpdates = [];
-  Product.findById = async () => ({ name: "Clean Code", quantity: 1 });
+  Product.findById = async () => ({ name: "Clean Code", quantity: 1, price: 200 });
+  Product.findOneAndUpdate = async (...args) => {
+    stockUpdates.push(args);
+  };
   Product.findByIdAndUpdate = async (...args) => {
     stockUpdates.push(args);
   };
@@ -107,6 +116,7 @@ test("createOrder rejects checkout when stock is insufficient", async () => {
     await createOrder(req, res);
   } finally {
     Product.findById = originalFindById;
+    Product.findOneAndUpdate = originalFindOneAndUpdate;
     Product.findByIdAndUpdate = originalFindByIdAndUpdate;
     Order.create = originalCreate;
   }
@@ -116,16 +126,27 @@ test("createOrder rejects checkout when stock is insufficient", async () => {
   assert.equal(stockUpdates.length, 0);
 });
 
-test("createOrder decrements stock and creates a processing order", async () => {
+test("createOrder recalculates totals from DB prices and creates a processing order", async () => {
   const originalFindById = Product.findById;
+  const originalFindOneAndUpdate = Product.findOneAndUpdate;
   const originalFindByIdAndUpdate = Product.findByIdAndUpdate;
   const originalCreate = Order.create;
   const originalUserFindById = User.findById;
 
-  const stockUpdates = [];
-  Product.findById = async () => ({ name: "Clean Code", quantity: 5 });
+  const atomicUpdates = [];
+  const rollbackUpdates = [];
+  Product.findById = async (id) => ({
+    _id: id,
+    name: "Clean Code",
+    quantity: 5,
+    price: 250,
+  });
+  Product.findOneAndUpdate = async (...args) => {
+    atomicUpdates.push(args);
+    return { _id: "product-1", quantity: 3 };
+  };
   Product.findByIdAndUpdate = async (...args) => {
-    stockUpdates.push(args);
+    rollbackUpdates.push(args);
   };
   User.findById = async () => null;
   Order.create = async (payload) => ({
@@ -140,6 +161,7 @@ test("createOrder decrements stock and creates a processing order", async () => 
     await createOrder(req, res);
   } finally {
     Product.findById = originalFindById;
+    Product.findOneAndUpdate = originalFindOneAndUpdate;
     Product.findByIdAndUpdate = originalFindByIdAndUpdate;
     Order.create = originalCreate;
     User.findById = originalUserFindById;
@@ -148,8 +170,78 @@ test("createOrder decrements stock and creates a processing order", async () => 
   assert.equal(res.statusCode, 201);
   assert.equal(res.body.status, "processing");
   assert.equal(res.body.userId, "user-1");
-  assert.deepEqual(stockUpdates, [
-    ["product-1", { $inc: { quantity: -2 } }],
+  assert.equal(res.body.subtotal, 500);
+  assert.equal(res.body.shipping, 0);
+  assert.equal(res.body.tax, 50);
+  assert.equal(res.body.total, 550);
+  assert.deepEqual(res.body.items, [
+    {
+      productId: "product-1",
+      name: "Clean Code",
+      price: 250,
+      quantity: 2,
+    },
+  ]);
+  assert.deepEqual(atomicUpdates, [
+    [
+      { _id: "product-1", quantity: { $gte: 2 } },
+      { $inc: { quantity: -2 } },
+      { new: true },
+    ],
+  ]);
+  assert.deepEqual(rollbackUpdates, []);
+});
+
+test("createOrder rolls back stock when an atomic decrement fails", async () => {
+  const originalFindById = Product.findById;
+  const originalFindOneAndUpdate = Product.findOneAndUpdate;
+  const originalFindByIdAndUpdate = Product.findByIdAndUpdate;
+  const originalCreate = Order.create;
+
+  const atomicUpdates = [];
+  const rollbackUpdates = [];
+  const products = {
+    "product-1": { _id: "product-1", name: "Clean Code", quantity: 5, price: 250 },
+    "product-2": { _id: "product-2", name: "1984", quantity: 3, price: 65 },
+  };
+
+  Product.findById = async (id) => products[id] || null;
+  Product.findOneAndUpdate = async (...args) => {
+    atomicUpdates.push(args);
+    return atomicUpdates.length === 1 ? { _id: "product-1", quantity: 3 } : null;
+  };
+  Product.findByIdAndUpdate = async (...args) => {
+    rollbackUpdates.push(args);
+  };
+  Order.create = async () => {
+    throw new Error("Order should not be created");
+  };
+
+  const req = {
+    user: { id: "user-1" },
+    body: makeOrderBody({
+      items: [
+        { productId: "product-1", quantity: 2 },
+        { productId: "product-2", quantity: 3 },
+      ],
+    }),
+  };
+  const res = makeRes();
+
+  try {
+    await createOrder(req, res);
+  } finally {
+    Product.findById = originalFindById;
+    Product.findOneAndUpdate = originalFindOneAndUpdate;
+    Product.findByIdAndUpdate = originalFindByIdAndUpdate;
+    Order.create = originalCreate;
+  }
+
+  assert.equal(res.statusCode, 400);
+  assert.deepEqual(res.body, { message: "Insufficient stock for: 1984" });
+  assert.equal(atomicUpdates.length, 2);
+  assert.deepEqual(rollbackUpdates, [
+    ["product-1", { $inc: { quantity: 2 } }],
   ]);
 });
 
