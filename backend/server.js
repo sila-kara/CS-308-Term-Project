@@ -16,6 +16,7 @@ app.use("/api/categories", require("./routes/categoryRoutes"));
 app.use("/api/orders", require("./routes/orderRoutes"));
 app.use("/api/comments", require("./routes/commentRoutes"));
 app.use("/api/wishlist", require("./routes/wishlistRoutes"));
+app.use("/api/notifications", require("./routes/notificationRoutes"));
 
 app.get("/", (req, res) => {
   res.send("Backend is running");

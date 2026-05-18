@@ -3,6 +3,36 @@
     <h1>Wishlist</h1>
     <p class="lead">Books you've saved for later.</p>
 
+    <section class="email-preferences" aria-label="Wishlist email preferences">
+      <div>
+        <h2>Email alerts</h2>
+        <p>Choose which wishlist updates should be sent to your email.</p>
+      </div>
+      <label class="preference-toggle">
+        <input
+          type="checkbox"
+          :checked="notificationsState.preferences.wishlistDiscounts"
+          @change="togglePreference('wishlistDiscounts', $event.target.checked)"
+        />
+        <span>
+          Discount alerts
+          <small>Email me when a wishlist item goes on sale or gets a deeper discount.</small>
+        </span>
+      </label>
+      <label class="preference-toggle">
+        <input
+          type="checkbox"
+          :checked="notificationsState.preferences.wishlistRestock"
+          @change="togglePreference('wishlistRestock', $event.target.checked)"
+        />
+        <span>
+          Back-in-stock alerts
+          <small>Email me when an out-of-stock wishlist item becomes available.</small>
+        </span>
+      </label>
+      <p v-if="preferenceMessage" class="preference-message">{{ preferenceMessage }}</p>
+    </section>
+
     <section class="wishlist-section" aria-label="Wishlisted products">
       <div class="product-grid" v-if="state.products.length > 0">
         <ProductCard
@@ -23,13 +53,33 @@
 </template>
 
 <script setup>
-import { onMounted } from "vue";
+import { onMounted, ref } from "vue";
 import ProductCard from "../components/ProductCard.vue";
+import { useNotificationsStore } from "../stores/notifications";
 import { useWishlistStore } from "../stores/wishlist";
 
 const { state, loadWishlist } = useWishlistStore();
+const {
+  state: notificationsState,
+  loadEmailPreferences,
+  updateEmailPreferences,
+} = useNotificationsStore();
+const preferenceMessage = ref("");
 
-onMounted(() => loadWishlist());
+async function togglePreference(key, value) {
+  preferenceMessage.value = "";
+  try {
+    await updateEmailPreferences({ [key]: value });
+    preferenceMessage.value = "Email preferences saved.";
+  } catch {
+    preferenceMessage.value = "Could not save email preferences.";
+  }
+}
+
+onMounted(() => {
+  loadWishlist();
+  loadEmailPreferences();
+});
 </script>
 
 <style scoped>
@@ -53,6 +103,62 @@ h1 {
 
 .wishlist-section {
   margin: 18px 0 18px;
+}
+
+.email-preferences {
+  display: grid;
+  gap: 12px;
+  margin: 20px 0;
+  padding: 16px;
+  border: 1px solid #dbe5f1;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.email-preferences h2 {
+  margin: 0 0 4px;
+  font-size: 1rem;
+}
+
+.email-preferences p {
+  margin: 0;
+  color: #64748b;
+  line-height: 1.45;
+}
+
+.preference-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.preference-toggle input {
+  margin-top: 3px;
+  accent-color: #2563eb;
+}
+
+.preference-toggle span {
+  display: grid;
+  gap: 2px;
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.preference-toggle small {
+  color: #64748b;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.preference-message {
+  color: #047857;
+  font-weight: 700;
+  font-size: 0.86rem;
 }
 
 .product-grid {

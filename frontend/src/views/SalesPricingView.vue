@@ -54,6 +54,7 @@
           <button class="save-btn" type="submit" :disabled="saving[product.id]">
             {{ saving[product.id] ? "Saving..." : "Save" }}
           </button>
+          <p v-if="notices[product.id]" class="pricing-notice">{{ notices[product.id] }}</p>
         </form>
       </article>
     </div>
@@ -69,6 +70,7 @@ import { isOnSale } from "../utils/productUtils";
 const { state: productsState, fetchProducts, updatePricing } = useProductsStore();
 const forms = reactive({});
 const saving = reactive({});
+const notices = reactive({});
 
 function toDateInput(value) {
   if (!value) return "";
@@ -99,6 +101,7 @@ function previewPrice(productId) {
 async function save(product) {
   const form = forms[product.id];
   saving[product.id] = true;
+  notices[product.id] = "";
   try {
     const updated = await updatePricing(product.id, {
       price: form.price,
@@ -114,6 +117,13 @@ async function save(product) {
       discountStartDate: toDateInput(updated.discountStartDate),
       discountEndDate: toDateInput(updated.discountEndDate),
     };
+    if (updated.wishlistNotificationsSent > 0) {
+      notices[product.id] = `${updated.wishlistNotificationsSent} wishlist customer notification created.`;
+    } else if (Number(updated.discountRate) > 0) {
+      notices[product.id] = "Discount saved. No wishlist customers to notify.";
+    } else {
+      notices[product.id] = "Pricing saved.";
+    }
   } catch (e) {
     alert(e.response?.data?.message || "Failed to update pricing.");
   } finally {
@@ -259,6 +269,13 @@ input {
   color: #fff;
   font-weight: 800;
   cursor: pointer;
+}
+.pricing-notice {
+  grid-column: 1 / -1;
+  margin: 2px 0 0;
+  color: #047857;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 .save-btn:disabled {
   opacity: 0.55;

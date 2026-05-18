@@ -26,12 +26,14 @@ import Footer from "./components/Footer.vue";
 import { useWishlistStore } from "./stores/wishlist";
 import { useAuthStore } from "./stores/auth";
 import { useProductsStore } from "./stores/products";
+import { useNotificationsStore } from "./stores/notifications";
 
 const route = useRoute();
 const isAdminRoute = computed(() => route.path.startsWith("/admin"));
 const isSalesRoute = computed(() => route.path.startsWith("/sales"));
 
 const { loadWishlist } = useWishlistStore();
+const { loadEmailPreferences, loadNotifications } = useNotificationsStore();
 const { state: authState } = useAuthStore();
 const { fetchProducts } = useProductsStore();
 
@@ -41,8 +43,15 @@ onMounted(() => {
 });
 
 watch(() => authState.user, (user) => {
-  if (user) loadWishlist();
-  else loadWishlist();
+  if (user) {
+    loadWishlist();
+    loadNotifications();
+    loadEmailPreferences();
+  } else {
+    loadWishlist();
+    loadNotifications();
+    loadEmailPreferences();
+  }
 }, { immediate: true });
 </script>
 

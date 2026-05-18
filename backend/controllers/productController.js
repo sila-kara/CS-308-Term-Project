@@ -1,4 +1,7 @@
 const Product = require("../models/Product");
+const User = require("../models/User");
+const sendDiscountEmail = require("../utils/sendDiscountEmail");
+const sendRestockEmail = require("../utils/sendRestockEmail");
 
 function roundMoney(value) {
   return Math.round(value * 100) / 100;
@@ -19,6 +22,100 @@ function withPricingView(product) {
     isDiscountActive: active,
     effectivePrice: active ? plain.discountedPrice : plain.price,
   };
+}
+
+function shouldNotifyDiscount(previous, next) {
+  if (!next.discountRate || !next.discountedPrice) return false;
+  if (!previous.discountRate || !previous.discountedPrice) return true;
+  return Number(next.discountedPrice) < Number(previous.discountedPrice);
+}
+
+async function notifyDiscountWishlistUsers(product) {
+  const users = await User.find(
+    { role: "customer", wishlist: product._id },
+    "name email emailPreferences notifications"
+  );
+
+  const notification = {
+    type: "discount",
+    product: product._id,
+    title: "Wishlist item on sale",
+    message: `${product.name} is now ${Number(product.discountedPrice).toFixed(2)} TL with ${Math.round(product.discountRate)}% off.`,
+    originalPrice: product.price,
+    discountedPrice: product.discountedPrice,
+    discountRate: product.discountRate,
+    read: false,
+    createdAt: new Date(),
+  };
+
+  let createdCount = 0;
+  let emailCount = 0;
+
+  await Promise.all(users.map(async (user) => {
+    if (!Array.isArray(user.notifications)) {
+      user.notifications = [];
+    }
+
+    user.notifications.unshift(notification);
+    user.notifications = user.notifications.slice(0, 50);
+    await user.save();
+    createdCount += 1;
+
+    if (user.emailPreferences?.wishlistDiscounts) {
+      try {
+        const sent = await sendDiscountEmail(user.email, user.name, product);
+        if (sent) emailCount += 1;
+      } catch (emailErr) {
+        console.error("Discount email error:", emailErr.message);
+      }
+    }
+  }));
+
+  return { notificationCount: createdCount, emailCount };
+}
+
+async function notifyRestockWishlistUsers(product) {
+  const users = await User.find(
+    { role: "customer", wishlist: product._id },
+    "name email emailPreferences notifications"
+  );
+
+  const notification = {
+    type: "restock",
+    product: product._id,
+    title: "Wishlist item back in stock",
+    message: `${product.name} is back in stock with ${Number(product.quantity || 0)} available.`,
+    originalPrice: product.price,
+    discountedPrice: product.discountedPrice || 0,
+    discountRate: product.discountRate || 0,
+    read: false,
+    createdAt: new Date(),
+  };
+
+  let createdCount = 0;
+  let emailCount = 0;
+
+  await Promise.all(users.map(async (user) => {
+    if (!Array.isArray(user.notifications)) {
+      user.notifications = [];
+    }
+
+    user.notifications.unshift(notification);
+    user.notifications = user.notifications.slice(0, 50);
+    await user.save();
+    createdCount += 1;
+
+    if (user.emailPreferences?.wishlistRestock) {
+      try {
+        const sent = await sendRestockEmail(user.email, user.name, product);
+        if (sent) emailCount += 1;
+      } catch (emailErr) {
+        console.error("Restock email error:", emailErr.message);
+      }
+    }
+  }));
+
+  return { notificationCount: createdCount, emailCount };
 }
 
 exports.getProducts = async (req, res) => {
@@ -75,6 +172,10 @@ exports.updatePricing = async (req, res) => {
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
+    const previousDiscount = {
+      discountRate: product.discountRate,
+      discountedPrice: product.discountedPrice,
+    };
 
     const {
       price,
@@ -133,7 +234,23 @@ exports.updatePricing = async (req, res) => {
     await product.save();
     await product.populate("category");
 
-    res.json(withPricingView(product));
+    let wishlistNotificationsSent = 0;
+    let wishlistEmailsSent = 0;
+    if (shouldNotifyDiscount(previousDiscount, product)) {
+      try {
+        const result = await notifyDiscountWishlistUsers(product);
+        wishlistNotificationsSent = result.notificationCount;
+        wishlistEmailsSent = result.emailCount;
+      } catch (notificationErr) {
+        console.error("Wishlist discount notification error:", notificationErr.message);
+      }
+    }
+
+    res.json({
+      ...withPricingView(product),
+      wishlistNotificationsSent,
+      wishlistEmailsSent,
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -200,17 +317,37 @@ exports.updateStock = async (req, res) => {
       return res.status(400).json({ message: "Valid quantity required" });
     }
 
-    const product = await Product.findByIdAndUpdate(
-      req.params.id,
-      { quantity },
-      { new: true }
-    ).populate("category");
-
-    if (!product) {
+    const previousProduct = await Product.findById(req.params.id);
+    if (!previousProduct) {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    res.json(withPricingView(product));
+    const previousQuantity = Number(previousProduct.quantity || 0);
+    const nextQuantity = Number(quantity);
+    previousProduct.quantity = nextQuantity;
+    await previousProduct.save();
+
+    const product = await Product.findById(
+      req.params.id,
+    ).populate("category");
+
+    let wishlistNotificationsSent = 0;
+    let wishlistEmailsSent = 0;
+    if (previousQuantity <= 0 && nextQuantity > 0) {
+      try {
+        const result = await notifyRestockWishlistUsers(product);
+        wishlistNotificationsSent = result.notificationCount;
+        wishlistEmailsSent = result.emailCount;
+      } catch (notificationErr) {
+        console.error("Wishlist restock notification error:", notificationErr.message);
+      }
+    }
+
+    res.json({
+      ...withPricingView(product),
+      wishlistNotificationsSent,
+      wishlistEmailsSent,
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
