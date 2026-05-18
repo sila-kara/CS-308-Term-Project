@@ -77,6 +77,52 @@
                 </div>
               </div>
             </div>
+            <div
+              class="notification-menu"
+              :class="{ open: notificationOpen }"
+              @mouseenter="openNotifications"
+              @mouseleave="notificationOpen = false"
+            >
+              <button type="button" class="nav-icon-link is-btn" :aria-expanded="notificationOpen" @click.stop="toggleNotifications">
+                <span class="nav-icon-wrap notification-wrap" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none">
+                    <path
+                      stroke="currentColor"
+                      stroke-width="1.75"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      d="M18 8a6 6 0 10-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M13.73 21a2 2 0 01-3.46 0"
+                    />
+                  </svg>
+                  <span v-if="unreadCount > 0" class="notification-badge">{{ unreadCount }}</span>
+                </span>
+                <span class="nav-label">Alerts</span>
+              </button>
+              <div class="notification-dropdown">
+                <div class="notification-panel">
+                  <div class="notification-head">
+                    <strong>Notifications</strong>
+                    <button v-if="unreadCount > 0" type="button" @click="markAllRead">Mark all read</button>
+                  </div>
+                  <p v-if="notificationsState.loading" class="notification-empty">Loading...</p>
+                  <p v-else-if="!notificationsState.items.length" class="notification-empty">No notifications yet.</p>
+                  <template v-else>
+                    <router-link
+                      v-for="notification in recentNotifications"
+                      :key="notification._id"
+                      class="notification-item"
+                      :class="{ unread: !notification.read }"
+                      :to="productPath(notification)"
+                      @click="handleNotificationClick(notification)"
+                    >
+                      <span>{{ notification.title }}</span>
+                      <small>{{ notification.message }}</small>
+                      <em>{{ formatNotificationDate(notification.createdAt) }}</em>
+                    </router-link>
+                  </template>
+                </div>
+              </div>
+            </div>
           </template>
 
           <router-link class="nav-icon-link" to="/wishlist">
@@ -152,13 +198,22 @@ import { useRoute, useRouter } from "vue-router";
 import { useProductsStore } from "../stores/products.js";
 import { useCartStore } from "../stores/cart";
 import { useAuthStore } from "../stores/auth";
+import { useNotificationsStore } from "../stores/notifications";
 import MiniCartDrawer from "./MiniCartDrawer.vue";
 
 const router = useRouter();
 const route = useRoute();
 const { cartCount } = useCartStore();
 const { isLoggedIn, logout } = useAuthStore();
+const {
+  state: notificationsState,
+  unreadCount,
+  loadNotifications,
+  markRead,
+  markAllRead,
+} = useNotificationsStore();
 const accountOpen = ref(false);
+const notificationOpen = ref(false);
 function handleLogout() { logout(); router.push("/login"); }
 const { state: productsState } = useProductsStore();
 
@@ -169,6 +224,8 @@ const searchQuery = ref(route.query.search || "");
 const categoriesWithoutAll = computed(() =>
   [...new Set(productsState.products.map((p) => p.category))].filter(Boolean).sort()
 );
+
+const recentNotifications = computed(() => notificationsState.items.slice(0, 5));
 
 watch(
   () => route.query.search,
@@ -182,6 +239,7 @@ watch(
   () => route.fullPath,
   () => {
     miniCartOpen.value = false;
+    notificationOpen.value = false;
   },
 );
 
@@ -207,6 +265,33 @@ function goToDeals() {
 function isActiveCategory(category) {
   const currentCategory = route.query.category || "All";
   return currentCategory === category;
+}
+
+function productPath(notification) {
+  const productId = notification.product?._id || notification.product;
+  return productId ? `/product/${productId}` : "/wishlist";
+}
+
+function handleNotificationClick(notification) {
+  if (!notification.read) markRead(notification._id);
+}
+
+function openNotifications() {
+  notificationOpen.value = true;
+  loadNotifications();
+}
+
+function toggleNotifications() {
+  notificationOpen.value = !notificationOpen.value;
+  if (notificationOpen.value) loadNotifications();
+}
+
+function formatNotificationDate(value) {
+  if (!value) return "";
+  return new Date(value).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  });
 }
 </script>
 
@@ -394,6 +479,10 @@ function isActiveCategory(category) {
   position: relative;
 }
 
+.notification-menu {
+  position: relative;
+}
+
 .account-dropdown {
   position: absolute;
   top: 100%;
@@ -441,6 +530,99 @@ function isActiveCategory(category) {
 .drop-divider { height: 1px; background: #e2e8f0; margin: 4px 0; }
 .drop-signout { color: #dc2626; font-weight: 600; }
 
+.notification-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  padding-top: 8px;
+  background: transparent;
+  z-index: 200;
+  width: min(360px, 88vw);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.notification-menu:hover .notification-dropdown,
+.notification-menu.open .notification-dropdown,
+.notification-dropdown:hover {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.notification-panel {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(15,23,42,0.12);
+  padding: 8px;
+  display: grid;
+  gap: 4px;
+}
+
+.notification-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px 8px;
+}
+
+.notification-head strong {
+  font-size: 0.9rem;
+}
+
+.notification-head button {
+  border: none;
+  background: transparent;
+  color: #2563eb;
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.notification-item {
+  display: grid;
+  gap: 3px;
+  border-radius: 9px;
+  padding: 10px;
+  color: #334155;
+  text-decoration: none;
+}
+
+.notification-item:hover {
+  background: #f8fafc;
+}
+
+.notification-item.unread {
+  background: #eff6ff;
+}
+
+.notification-item span {
+  color: #0f172a;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.notification-item small {
+  color: #475569;
+  line-height: 1.35;
+}
+
+.notification-item em,
+.notification-empty {
+  color: #94a3b8;
+  font-size: 0.72rem;
+  font-style: normal;
+}
+
+.notification-empty {
+  margin: 0;
+  padding: 16px 10px;
+}
+
 .nav-icon-wrap {
   display: grid;
   place-items: center;
@@ -462,7 +644,12 @@ function isActiveCategory(category) {
   position: relative;
 }
 
-.cart-badge {
+.notification-wrap {
+  position: relative;
+}
+
+.cart-badge,
+.notification-badge {
   position: absolute;
   top: -6px;
   right: -8px;
@@ -478,6 +665,10 @@ function isActiveCategory(category) {
   align-items: center;
   justify-content: center;
   line-height: 1;
+}
+
+.notification-badge {
+  background: #dc2626;
 }
 
 .category-nav {

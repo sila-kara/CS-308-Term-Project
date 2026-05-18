@@ -1,9 +1,26 @@
 const User = require("../models/User");
 
+function isDiscountActive(product, now = new Date()) {
+  if (!product || !product.discountRate || !product.discountedPrice) return false;
+  if (product.discountStartDate && new Date(product.discountStartDate) > now) return false;
+  if (product.discountEndDate && new Date(product.discountEndDate) < now) return false;
+  return true;
+}
+
+function withPricingView(product) {
+  const plain = typeof product.toObject === "function" ? product.toObject() : product;
+  const active = isDiscountActive(plain);
+  return {
+    ...plain,
+    isDiscountActive: active,
+    effectivePrice: active ? plain.discountedPrice : plain.price,
+  };
+}
+
 exports.getWishlist = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).populate("wishlist");
-    res.json(user.wishlist);
+    res.json(user.wishlist.map(withPricingView));
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
