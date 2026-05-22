@@ -12,6 +12,7 @@ router.use(authMiddleware);
 router.post("/", createOrder);
 router.get("/", getOrdersByUser);
 router.get("/admin/all", requireRole("product_manager"), getAllOrders);
+router.get("/admin/invoices/:id/pdf", requireRole("product_manager"), getSalesInvoicePdf);
 router.get("/sales/refunds", requireRole("sales_manager"), getRefundRequests);
 router.get("/sales/invoices", requireRole("sales_manager"), getSalesInvoices);
 router.get("/sales/invoices/:id/pdf", requireRole("sales_manager"), getSalesInvoicePdf);

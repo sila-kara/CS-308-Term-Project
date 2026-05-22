@@ -61,6 +61,9 @@
             </button>
             <span v-else-if="order.status === 'delivered'" class="delivered-tag">✅ Delivered</span>
             <span v-else-if="order.status === 'cancelled'" class="cancelled-tag">🚫 Cancelled</span>
+            <a :href="`/api/admin/invoices/${order._id}/pdf`" target="_blank" class="invoice-btn">
+              View Invoice
+            </a>
           </div>
         </div>
       </template>
@@ -107,16 +110,23 @@
                     <span v-else class="completed-no">No</span>
                   </td>
                   <td :rowspan="i === 0 ? order.items.length : undefined" v-if="i === 0">
-                    <button
-                      v-if="order.status !== 'delivered' && order.status !== 'cancelled'"
-                      class="btn advance small-btn"
-                      :disabled="advancing[order._id]"
-                      @click="advance(order)"
-                    >
-                      {{ advancing[order._id] ? "…" : `→ ${nextStatus(order.status)}` }}
-                    </button>
-                    <span v-else-if="order.status === 'delivered'" class="delivered-tag">✅</span>
-                    <span v-else class="cancelled-tag">🚫</span>
+                    <div class="action-col">
+                      <button
+                        v-if="order.status !== 'delivered' && order.status !== 'cancelled'"
+                        class="btn advance small-btn"
+                        :disabled="advancing[order._id]"
+                        @click="advance(order)"
+                      >
+                        {{ advancing[order._id] ? "…" : `→ ${nextStatus(order.status)}` }}
+                      </button>
+                      <span v-else-if="order.status === 'delivered'" class="delivered-tag">✅</span>
+                      <span v-else class="cancelled-tag">🚫</span>
+                      <a
+                        :href="`/api/admin/invoices/${order._id}/pdf`"
+                        target="_blank"
+                        class="invoice-btn"
+                      >Invoice</a>
+                    </div>
                   </td>
                 </tr>
               </template>
@@ -392,6 +402,19 @@ code { background: #ede9fe; border-radius: 4px; padding: 1px 6px; font-size: 0.8
 .completed-yes { color: #16a34a; font-weight: 700; }
 .completed-no { color: #dc2626; font-weight: 700; }
 .completed-cancelled { color: #94a3b8; font-weight: 600; }
+.action-col { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.invoice-btn {
+  padding: 4px 12px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #1e40af;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.invoice-btn:hover { background: #dbeafe; }
 .cancelled-tag { font-size: 0.85rem; color: #991b1b; font-weight: 600; }
 
 .empty { text-align: center; padding: 60px; color: #94a3b8; font-size: 0.95rem; }
