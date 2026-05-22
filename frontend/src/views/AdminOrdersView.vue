@@ -13,8 +13,14 @@
     <div v-else-if="error" style="text-align:center;padding:60px;color:#b91c1c">{{ error }}</div>
 
     <template v-else>
-      <!-- Filter tabs -->
-      <div class="tabs">
+      <!-- View toggle -->
+      <div class="view-toggle">
+        <button :class="['toggle-btn', { active: viewMode === 'cards' }]" @click="viewMode = 'cards'">Order Cards</button>
+        <button :class="['toggle-btn', { active: viewMode === 'delivery' }]" @click="viewMode = 'delivery'">Delivery List</button>
+      </div>
+
+      <!-- Filter tabs (cards view only) -->
+      <div v-if="viewMode === 'cards'" class="tabs">
         <button
           v-for="tab in tabs" :key="tab.value"
           :class="['tab', { active: activeTab === tab.value }]"
@@ -22,43 +28,102 @@
         >{{ tab.label }} <span class="badge">{{ countFor(tab.value) }}</span></button>
       </div>
 
-      <div v-if="filteredOrders.length === 0" class="empty">No orders in this category.</div>
+      <!-- ── CARD VIEW ── -->
+      <template v-if="viewMode === 'cards'">
+        <div v-if="filteredOrders.length === 0" class="empty">No orders in this category.</div>
 
-      <div v-for="order in filteredOrders" :key="order._id" class="order-card">
-        <div class="order-top">
-          <div>
-            <span class="inv">{{ order.invoiceNumber }}</span>
-            <span :class="['status-badge', order.status]">{{ order.status }}</span>
+        <div v-for="order in filteredOrders" :key="order._id" class="order-card">
+          <div class="order-top">
+            <div>
+              <span class="inv">{{ order.invoiceNumber }}</span>
+              <span :class="['status-badge', order.status]">{{ order.status }}</span>
+            </div>
+            <div class="meta">
+              <span>{{ order.userId?.name || "—" }}</span>
+              <span>{{ order.userId?.email || "—" }}</span>
+              <span>{{ formatDate(order.createdAt) }}</span>
+              <strong>{{ order.total?.toFixed(2) }} TL</strong>
+            </div>
           </div>
-          <div class="meta">
-            <span>{{ order.userId?.name || "—" }}</span>
-            <span>{{ order.userId?.email || "—" }}</span>
-            <span>{{ formatDate(order.createdAt) }}</span>
-            <strong>{{ order.total?.toFixed(2) }} TL</strong>
+          <div class="items">
+            <span v-for="(item, i) in order.items" :key="i" class="item-chip">
+              {{ item.name }} ×{{ item.quantity }}
+            </span>
+          </div>
+          <div class="actions">
+            <button
+              v-if="order.status !== 'delivered' && order.status !== 'cancelled'"
+              class="btn advance"
+              :disabled="advancing[order._id]"
+              @click="advance(order)"
+            >
+              {{ advancing[order._id] ? "Updating…" : `→ ${nextStatus(order.status)}` }}
+            </button>
+            <span v-else-if="order.status === 'delivered'" class="delivered-tag">✅ Delivered</span>
+            <span v-else-if="order.status === 'cancelled'" class="cancelled-tag">🚫 Cancelled</span>
           </div>
         </div>
+      </template>
 
-        <!-- Items -->
-        <div class="items">
-          <span v-for="(item, i) in order.items" :key="i" class="item-chip">
-            {{ item.name }} ×{{ item.quantity }}
-          </span>
+      <!-- ── DELIVERY LIST VIEW ── -->
+      <template v-else>
+        <div v-if="orders.length === 0" class="empty">No deliveries found.</div>
+        <div v-else class="dl-wrapper">
+          <table class="dl-table">
+            <thead>
+              <tr>
+                <th>Delivery ID</th>
+                <th>Customer ID</th>
+                <th>Product ID</th>
+                <th>Product</th>
+                <th>Qty</th>
+                <th>Total Price</th>
+                <th>Delivery Address</th>
+                <th>Completed</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <template v-for="order in orders" :key="order._id">
+                <tr v-for="(item, i) in order.items" :key="item.productId + i">
+                  <td class="mono small" :rowspan="i === 0 ? order.items.length : undefined" v-if="i === 0">
+                    {{ order._id }}
+                  </td>
+                  <td class="mono small" :rowspan="i === 0 ? order.items.length : undefined" v-if="i === 0">
+                    {{ order.userId?._id || order.userId || "—" }}
+                  </td>
+                  <td class="mono small">{{ item.productId }}</td>
+                  <td>{{ item.name }}</td>
+                  <td class="center">{{ item.quantity }}</td>
+                  <td :rowspan="i === 0 ? order.items.length : undefined" v-if="i === 0">
+                    {{ order.total?.toFixed(2) }} TL
+                  </td>
+                  <td :rowspan="i === 0 ? order.items.length : undefined" v-if="i === 0" class="addr">
+                    {{ order.deliveryAddress || "—" }}
+                  </td>
+                  <td :rowspan="i === 0 ? order.items.length : undefined" v-if="i === 0" class="center">
+                    <span v-if="order.status === 'delivered'" class="completed-yes">Yes</span>
+                    <span v-else-if="order.status === 'cancelled'" class="completed-cancelled">Cancelled</span>
+                    <span v-else class="completed-no">No</span>
+                  </td>
+                  <td :rowspan="i === 0 ? order.items.length : undefined" v-if="i === 0">
+                    <button
+                      v-if="order.status !== 'delivered' && order.status !== 'cancelled'"
+                      class="btn advance small-btn"
+                      :disabled="advancing[order._id]"
+                      @click="advance(order)"
+                    >
+                      {{ advancing[order._id] ? "…" : `→ ${nextStatus(order.status)}` }}
+                    </button>
+                    <span v-else-if="order.status === 'delivered'" class="delivered-tag">✅</span>
+                    <span v-else class="cancelled-tag">🚫</span>
+                  </td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
         </div>
-
-        <!-- Actions -->
-        <div class="actions">
-          <button
-            v-if="order.status !== 'delivered' && order.status !== 'cancelled'"
-            class="btn advance"
-            :disabled="advancing[order._id]"
-            @click="advance(order)"
-          >
-            {{ advancing[order._id] ? "Updating…" : `→ ${nextStatus(order.status)}` }}
-          </button>
-          <span v-else-if="order.status === 'delivered'" class="delivered-tag">✅ Delivered</span>
-          <span v-else-if="order.status === 'cancelled'" class="cancelled-tag">🚫 Cancelled</span>
-        </div>
-      </div>
+      </template>
     </template>
   </div>
 </template>
@@ -73,6 +138,7 @@ const loading = ref(false);
 const error = ref("");
 const advancing = reactive({});
 const activeTab = ref("all");
+const viewMode = ref("cards");
 
 const STATUS_NEXT = { processing: "in-transit", "in-transit": "delivered" };
 function nextStatus(s) { return STATUS_NEXT[s] || ""; }
@@ -267,6 +333,65 @@ code { background: #ede9fe; border-radius: 4px; padding: 1px 6px; font-size: 0.8
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .return-photo { display: block; max-width: 200px; max-height: 160px; border-radius: 8px; border: 1px solid #e2e8f0; margin-top: 8px; object-fit: cover; }
 .delivered-tag { font-size: 0.85rem; color: #166534; font-weight: 600; }
+.cancelled-tag { font-size: 0.85rem; color: #991b1b; font-weight: 600; }
+.empty { padding: 40px 0; text-align: center; color: #94a3b8; }
+
+.view-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.toggle-btn {
+  padding: 8px 20px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  font-weight: 600;
+  font-size: 0.88rem;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.toggle-btn.active {
+  background: #1e3a8a;
+  color: #fff;
+  border-color: #1e3a8a;
+}
+
+.dl-wrapper {
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+.dl-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+.dl-table th {
+  background: #f1f5f9;
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 700;
+  color: #475569;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+.dl-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+.dl-table tr:last-child td { border-bottom: none; }
+.dl-table tr:hover td { background: #f8fafc; }
+.mono { font-family: monospace; color: #64748b; }
+.small { font-size: 0.75rem; }
+.center { text-align: center; }
+.addr { max-width: 180px; word-break: break-word; }
+.small-btn { padding: 5px 10px; font-size: 0.78rem; }
+.completed-yes { color: #16a34a; font-weight: 700; }
+.completed-no { color: #dc2626; font-weight: 700; }
+.completed-cancelled { color: #94a3b8; font-weight: 600; }
 .cancelled-tag { font-size: 0.85rem; color: #991b1b; font-weight: 600; }
 
 .empty { text-align: center; padding: 60px; color: #94a3b8; font-size: 0.95rem; }
