@@ -1,32 +1,64 @@
 const nodemailer = require("nodemailer");
 const PDFDocument = require("pdfkit");
+const fs = require("fs");
+
+const FONT_CANDIDATES = {
+  regular: [
+    "/System/Library/Fonts/Supplemental/Arial.ttf",
+    "/Library/Fonts/Arial.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+  ],
+  bold: [
+    "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+    "/Library/Fonts/Arial Bold.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+  ],
+};
+
+function firstExisting(paths) {
+  return paths.find((fontPath) => fs.existsSync(fontPath));
+}
+
+function registerInvoiceFonts(doc) {
+  const regular = firstExisting(FONT_CANDIDATES.regular);
+  const bold = firstExisting(FONT_CANDIDATES.bold);
+
+  if (regular) doc.registerFont("InvoiceRegular", regular);
+  if (bold) doc.registerFont("InvoiceBold", bold);
+
+  return {
+    regular: regular ? "InvoiceRegular" : "Helvetica",
+    bold: bold ? "InvoiceBold" : "Helvetica-Bold",
+  };
+}
 
 function generateInvoicePdf(order, userName) {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50, size: "A4" });
+    const fonts = registerInvoiceFonts(doc);
     const chunks = [];
     doc.on("data", (chunk) => chunks.push(chunk));
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
     // Header
-    doc.fontSize(22).font("Helvetica-Bold").text("BookWorld", 50, 50);
-    doc.fontSize(10).font("Helvetica").fillColor("#555")
+    doc.fontSize(22).font(fonts.bold).text("BookWorld", 50, 50);
+    doc.fontSize(10).font(fonts.regular).fillColor("#555")
       .text("bookworld.com  |  bookworld.store.cs308@gmail.com", 50, 78);
 
     doc.moveTo(50, 100).lineTo(545, 100).strokeColor("#ddd").stroke();
 
     // Invoice info
-    doc.fillColor("#000").fontSize(18).font("Helvetica-Bold")
+    doc.fillColor("#000").fontSize(18).font(fonts.bold)
       .text("INVOICE", 50, 115);
-    doc.fontSize(10).font("Helvetica")
+    doc.fontSize(10).font(fonts.regular)
       .text(`Invoice No: ${order.invoiceNumber}`, 50, 142)
       .text(`Date: ${new Date(order.createdAt).toLocaleDateString("tr-TR")}`, 50, 157)
       .text(`Status: ${order.status}`, 50, 172);
 
     // Customer info
-    doc.fontSize(10).font("Helvetica-Bold").text("Bill To:", 350, 142);
-    doc.font("Helvetica")
+    doc.fontSize(10).font(fonts.bold).text("Bill To:", 350, 142);
+    doc.font(fonts.regular)
       .text(userName || "Customer", 350, 157)
       .text(order.deliveryAddress || "—", 350, 172, { width: 195 });
 
@@ -34,7 +66,7 @@ function generateInvoicePdf(order, userName) {
 
     // Items table header
     let y = 225;
-    doc.fontSize(9).font("Helvetica-Bold").fillColor("#444")
+    doc.fontSize(9).font(fonts.bold).fillColor("#444")
       .text("Item", 50, y)
       .text("Qty", 360, y, { width: 50, align: "right" })
       .text("Unit Price", 410, y, { width: 70, align: "right" })
@@ -44,7 +76,7 @@ function generateInvoicePdf(order, userName) {
     y += 22;
 
     // Items
-    doc.font("Helvetica").fillColor("#000");
+    doc.font(fonts.regular).fillColor("#000");
     for (const item of order.items) {
       doc.fontSize(9)
         .text(item.name, 50, y, { width: 300 })
@@ -58,20 +90,20 @@ function generateInvoicePdf(order, userName) {
     y += 18;
 
     // Totals
-    doc.fontSize(9).font("Helvetica")
+    doc.fontSize(9).font(fonts.regular)
       .text("Subtotal", 380, y, { width: 100, align: "right" })
       .text(`${order.subtotal.toFixed(2)} TL`, 480, y, { width: 65, align: "right" });
     y += 16;
     doc.text("Tax (10%)", 380, y, { width: 100, align: "right" })
       .text(`${order.tax.toFixed(2)} TL`, 480, y, { width: 65, align: "right" });
     y += 16;
-    doc.font("Helvetica-Bold").fontSize(10)
+    doc.font(fonts.bold).fontSize(10)
       .text("Total", 380, y, { width: 100, align: "right" })
       .text(`${order.total.toFixed(2)} TL`, 480, y, { width: 65, align: "right" });
 
     // Payment note
     y += 32;
-    doc.fontSize(9).font("Helvetica").fillColor("#555")
+    doc.fontSize(9).font(fonts.regular).fillColor("#555")
       .text(`Payment: ${order.paymentMethod} ending ${order.cardLast4}`, 50, y);
 
     // Footer
