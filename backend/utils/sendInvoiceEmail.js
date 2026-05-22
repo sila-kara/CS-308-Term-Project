@@ -161,3 +161,4 @@ const sendInvoiceEmail = async (toEmail, order, userName) => {
 };
 
 module.exports = sendInvoiceEmail;
+module.exports.generateInvoicePdf = generateInvoicePdf;

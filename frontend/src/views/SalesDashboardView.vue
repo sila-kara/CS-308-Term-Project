@@ -17,11 +17,11 @@
         <strong>Set product prices and discounts</strong>
         <span class="hint">Update list price, cost, discount rate, and campaign dates.</span>
       </router-link>
-      <div class="action-card muted">
+      <router-link class="action-card" to="/sales/invoices">
         <span class="label">Invoices & Reports</span>
-        <strong>Coming later</strong>
-        <span class="hint">List invoices by date and view revenue/profit charts.</span>
-      </div>
+        <strong>Open invoice list</strong>
+        <span class="hint">Filter invoices by date and view, print, or download PDFs.</span>
+      </router-link>
     </section>
   </div>
 </template>
