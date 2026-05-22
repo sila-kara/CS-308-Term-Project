@@ -61,7 +61,7 @@
             </button>
             <span v-else-if="order.status === 'delivered'" class="delivered-tag">✅ Delivered</span>
             <span v-else-if="order.status === 'cancelled'" class="cancelled-tag">🚫 Cancelled</span>
-            <a :href="`/api/admin/invoices/${order._id}/pdf`" target="_blank" class="invoice-btn">
+            <a :href="`/api/orders/admin/invoices/${order._id}/pdf`" target="_blank" class="invoice-btn">
               View Invoice
             </a>
           </div>
@@ -122,7 +122,7 @@
                       <span v-else-if="order.status === 'delivered'" class="delivered-tag">✅</span>
                       <span v-else class="cancelled-tag">🚫</span>
                       <a
-                        :href="`/api/admin/invoices/${order._id}/pdf`"
+                        :href="`/api/orders/admin/invoices/${order._id}/pdf`"
                         target="_blank"
                         class="invoice-btn"
                       >Invoice</a>
