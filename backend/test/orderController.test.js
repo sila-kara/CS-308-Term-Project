@@ -6,6 +6,7 @@ const Product = require("../models/Product");
 const User = require("../models/User");
 const {
   createOrder,
+  getSalesInvoices,
   approveReturn,
   refundReturn,
 } = require("../controllers/orderController");
@@ -288,6 +289,67 @@ test("createOrder uses active discounted DB price at checkout", async () => {
   assert.equal(res.body.subtotal, 320);
   assert.equal(res.body.tax, 32);
   assert.equal(res.body.total, 352);
+});
+
+test("getSalesInvoices filters invoices by selected date range", async () => {
+  const originalFind = Order.find;
+  let filterUsed;
+
+  Order.find = (filter) => {
+    filterUsed = filter;
+    return {
+      sort() {
+        return this;
+      },
+      async populate() {
+        return [{ invoiceNumber: "INV-1", total: 220 }];
+      },
+    };
+  };
+
+  const req = {
+    query: {
+      startDate: "2026-05-01",
+      endDate: "2026-05-21",
+    },
+  };
+  const res = makeRes();
+
+  try {
+    await getSalesInvoices(req, res);
+  } finally {
+    Order.find = originalFind;
+  }
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.body.length, 1);
+  assert.ok(filterUsed.createdAt.$gte instanceof Date);
+  assert.ok(filterUsed.createdAt.$lte instanceof Date);
+  assert.ok(filterUsed.createdAt.$gte <= filterUsed.createdAt.$lte);
+});
+
+test("getSalesInvoices rejects invalid date ranges", async () => {
+  const originalFind = Order.find;
+  Order.find = () => {
+    throw new Error("Order.find should not be called");
+  };
+
+  const req = {
+    query: {
+      startDate: "2026-05-22",
+      endDate: "2026-05-01",
+    },
+  };
+  const res = makeRes();
+
+  try {
+    await getSalesInvoices(req, res);
+  } finally {
+    Order.find = originalFind;
+  }
+
+  assert.equal(res.statusCode, 400);
+  assert.deepEqual(res.body, { message: "Invalid invoice date range" });
 });
 
 function makeReturnOrder(overrides = {}) {

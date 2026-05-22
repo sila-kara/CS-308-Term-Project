@@ -11,6 +11,7 @@ import AdminReviewsView from "../views/AdminReviewsView.vue";
 import AdminOrdersView from "../views/AdminOrdersView.vue";
 import AdminProductsView from "../views/AdminProductsView.vue";
 import SalesDashboardView from "../views/SalesDashboardView.vue";
+import SalesInvoicesView from "../views/SalesInvoicesView.vue";
 import SalesPricingView from "../views/SalesPricingView.vue";
 import SalesRefundsView from "../views/SalesRefundsView.vue";
 import WishlistView from "../views/WishlistView.vue";
@@ -117,6 +118,12 @@ const router = createRouter({
       path: "/sales/pricing",
       name: "sales-pricing",
       component: SalesPricingView,
+      meta: { requiresAuth: true, roles: ["sales_manager"] },
+    },
+    {
+      path: "/sales/invoices",
+      name: "sales-invoices",
+      component: SalesInvoicesView,
       meta: { requiresAuth: true, roles: ["sales_manager"] },
     },
     { path: "/shipping", name: "shipping", component: ShippingView },

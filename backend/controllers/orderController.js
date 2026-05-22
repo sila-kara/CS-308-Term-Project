@@ -1,6 +1,7 @@
 const Order = require("../models/Order");
 const Product = require("../models/Product");
 const sendInvoiceEmail = require("../utils/sendInvoiceEmail");
+const { generateInvoicePdf } = require("../utils/sendInvoiceEmail");
 const sendStatusEmail = require("../utils/sendStatusEmail");
 const sendReturnEmail = require("../utils/sendReturnEmail");
 
@@ -83,6 +84,30 @@ function isDiscountActive(product, now = new Date()) {
 
 function getCheckoutPrice(product) {
   return isDiscountActive(product) ? product.discountedPrice : product.price;
+}
+
+function buildDateRangeFilter(startDate, endDate) {
+  const createdAt = {};
+
+  if (startDate) {
+    const start = new Date(startDate);
+    if (Number.isNaN(start.getTime())) return null;
+    start.setHours(0, 0, 0, 0);
+    createdAt.$gte = start;
+  }
+
+  if (endDate) {
+    const end = new Date(endDate);
+    if (Number.isNaN(end.getTime())) return null;
+    end.setHours(23, 59, 59, 999);
+    createdAt.$lte = end;
+  }
+
+  if (createdAt.$gte && createdAt.$lte && createdAt.$gte > createdAt.$lte) {
+    return null;
+  }
+
+  return Object.keys(createdAt).length ? { createdAt } : {};
 }
 
 exports.createOrder = async (req, res) => {
@@ -189,6 +214,39 @@ exports.getRefundRequests = async (req, res) => {
       .sort({ returnRequestedAt: -1, createdAt: -1 })
       .populate("userId", "name email");
     res.json(orders);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.getSalesInvoices = async (req, res) => {
+  try {
+    const dateFilter = buildDateRangeFilter(req.query.startDate, req.query.endDate);
+    if (dateFilter === null) {
+      return res.status(400).json({ message: "Invalid invoice date range" });
+    }
+
+    const orders = await Order.find(dateFilter)
+      .sort({ createdAt: -1 })
+      .populate("userId", "name email");
+    res.json(orders);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.getSalesInvoicePdf = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id).populate("userId", "name email");
+    if (!order) return res.status(404).json({ message: "Order not found" });
+
+    const pdfBuffer = await generateInvoicePdf(order, order.userId?.name);
+    const disposition = req.query.download === "true" ? "attachment" : "inline";
+    const filename = `${order.invoiceNumber || order._id}.pdf`;
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `${disposition}; filename="${filename}"`);
+    res.send(pdfBuffer);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
