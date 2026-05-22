@@ -49,6 +49,10 @@ describe("validateProduct", () => {
   it("returns false for an empty object", () => {
     expect(validateProduct({})).toBe(false);
   });
+
+  it("returns false when price is null", () => {
+    expect(validateProduct(makeProduct({ price: null }))).toBe(false);
+  });
 });
 
 describe("filterByCategory", () => {
@@ -94,6 +98,17 @@ describe("sortByPrice", () => {
     const original = [...products];
     sortByPrice(products, "asc");
     expect(products).toEqual(original);
+  });
+
+  it("returns all products when prices are equal", () => {
+    const samePriceProducts = [
+      makeProduct({ id: 1, price: 50 }),
+      makeProduct({ id: 2, price: 50 }),
+      makeProduct({ id: 3, price: 50 }),
+    ];
+    const result = sortByPrice(samePriceProducts, "asc");
+    expect(result).toHaveLength(3);
+    expect(result.every((p) => p.price === 50)).toBe(true);
   });
 });
 
@@ -148,5 +163,15 @@ describe("searchProducts", () => {
 
   it("returns empty array when nothing matches", () => {
     expect(searchProducts(products, "zzznomatch")).toHaveLength(0);
+  });
+
+  it("does not crash and returns correct results with special characters in query", () => {
+    const prods = [
+      makeProduct({ id: 1, name: "C++ Programming", description: "Systems language" }),
+      makeProduct({ id: 2, name: "Python Basics", description: "Beginner guide" }),
+    ];
+    expect(() => searchProducts(prods, "C++")).not.toThrow();
+    expect(searchProducts(prods, "C++")).toHaveLength(1);
+    expect(searchProducts(prods, "C++")[0].id).toBe(1);
   });
 });

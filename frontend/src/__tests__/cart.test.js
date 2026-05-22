@@ -98,6 +98,13 @@ describe("updateQuantity", () => {
     const cart = [{ product, quantity: 1 }];
     expect(() => updateQuantity(cart, 99, 2)).toThrow("Product not found in cart");
   });
+
+  it("succeeds when new quantity exactly equals available stock", () => {
+    const product = makeProduct(1, 10, 5);
+    const cart = [{ product, quantity: 1 }];
+    const result = updateQuantity(cart, 1, 5);
+    expect(result[0].quantity).toBe(5);
+  });
 });
 
 describe("calculateTotal", () => {
@@ -116,6 +123,12 @@ describe("calculateTotal", () => {
     const p2 = makeProduct(2, 25, 5);
     const cart = [{ product: p1, quantity: 2 }, { product: p2, quantity: 3 }];
     expect(calculateTotal(cart)).toBe(95);
+  });
+
+  it("treats a zero quantity item as contributing zero to total", () => {
+    const product = makeProduct(1, 20, 10);
+    const cart = [{ product, quantity: 0 }];
+    expect(calculateTotal(cart)).toBe(0);
   });
 });
 
