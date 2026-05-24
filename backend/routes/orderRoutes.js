@@ -3,7 +3,7 @@ const {
   createOrder, getOrdersByUser, getOrderById,
   advanceStatus, getAllOrders, requestReturn,
   approveReturn, rejectReturn, refundReturn, cancelOrder, getRefundRequests,
-  getSalesInvoicePdf, getSalesInvoices,
+  getSalesAnalytics, getSalesInvoicePdf, getSalesInvoices,
 } = require("../controllers/orderController");
 const { authMiddleware, requireRole } = require("../middleware/auth");
 
@@ -14,6 +14,7 @@ router.get("/", getOrdersByUser);
 router.get("/admin/all", requireRole("product_manager"), getAllOrders);
 router.get("/admin/invoices/:id/pdf", requireRole("product_manager"), getSalesInvoicePdf);
 router.get("/sales/refunds", requireRole("sales_manager"), getRefundRequests);
+router.get("/sales/analytics", requireRole("sales_manager"), getSalesAnalytics);
 router.get("/sales/invoices", requireRole("sales_manager"), getSalesInvoices);
 router.get("/sales/invoices/:id/pdf", requireRole("sales_manager"), getSalesInvoicePdf);
 router.get("/:id", getOrderById);
