@@ -22,6 +22,11 @@
         <strong>Open invoice list</strong>
         <span class="hint">Filter invoices by date and view, print, or download PDFs.</span>
       </router-link>
+      <router-link class="action-card" to="/sales/analytics">
+        <span class="label">Revenue Analytics</span>
+        <strong>View profit/loss chart</strong>
+        <span class="hint">Choose a date range and compare revenue, cost, and profit/loss.</span>
+      </router-link>
     </section>
   </div>
 </template>

@@ -33,7 +33,7 @@ function getSelectedReturnItems(order) {
   if (selected.size === 0) return [];
 
   return order.items.filter((item) => {
-    const productId = item.productId?.toString();
+    const productId = (item.productId?._id || item.productId)?.toString();
     return selected.has(productId) || selected.has(item.name);
   });
 }
@@ -73,6 +73,58 @@ function calculateOrderTotals(items) {
   const total = roundMoney(subtotal + shipping + tax);
 
   return { subtotal, shipping, tax, total };
+}
+
+function getItemRevenue(item) {
+  return Number(item.price || 0) * Number(item.quantity || 0);
+}
+
+function getItemCost(item) {
+  const storedCost = item.cost === undefined || item.cost === null ? NaN : Number(item.cost);
+  const fallbackCost = Number(item.productId?.cost || 0);
+  const unitCost = Number.isFinite(storedCost) ? storedCost : fallbackCost;
+  return unitCost * Number(item.quantity || 0);
+}
+
+function toChartDate(value) {
+  return new Date(value).toISOString().slice(0, 10);
+}
+
+function getReturnedItemTotals(order) {
+  if (order.returnStatus !== "refunded") {
+    return { revenue: 0, cost: 0, units: 0 };
+  }
+
+  const returnedItems = getSelectedReturnItems(order);
+  if (returnedItems.length === 0) {
+    return {
+      revenue: Number(order.returnRefundAmount || 0),
+      cost: 0,
+      units: 0,
+    };
+  }
+
+  return returnedItems.reduce(
+    (totals, item) => ({
+      revenue: totals.revenue + getItemRevenue(item),
+      cost: totals.cost + getItemCost(item),
+      units: totals.units + Number(item.quantity || 0),
+    }),
+    { revenue: 0, cost: 0, units: 0 }
+  );
+}
+
+function emptyAnalyticsSummary(startDate, endDate) {
+  return {
+    startDate: startDate || null,
+    endDate: endDate || null,
+    revenue: 0,
+    cost: 0,
+    profit: 0,
+    orderCount: 0,
+    unitsSold: 0,
+    points: [],
+  };
 }
 
 function isDiscountActive(product, now = new Date()) {
@@ -137,6 +189,7 @@ exports.createOrder = async (req, res) => {
         productId: item.productId,
         name: product.name,
         price: getCheckoutPrice(product),
+        cost: product.cost || 0,
         quantity: item.quantity,
       });
     }
@@ -230,6 +283,60 @@ exports.getSalesInvoices = async (req, res) => {
       .sort({ createdAt: -1 })
       .populate("userId", "name email");
     res.json(orders);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.getSalesAnalytics = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const dateFilter = buildDateRangeFilter(startDate, endDate);
+    if (dateFilter === null) {
+      return res.status(400).json({ message: "Invalid analytics date range" });
+    }
+
+    const orders = await Order.find({
+      ...dateFilter,
+      status: { $ne: "cancelled" },
+    })
+      .sort({ createdAt: 1 })
+      .populate("items.productId", "cost");
+
+    const summary = emptyAnalyticsSummary(startDate, endDate);
+    const byDate = new Map();
+
+    for (const order of orders) {
+      const soldTotals = order.items.reduce(
+        (totals, item) => ({
+          revenue: totals.revenue + getItemRevenue(item),
+          cost: totals.cost + getItemCost(item),
+          units: totals.units + Number(item.quantity || 0),
+        }),
+        { revenue: 0, cost: 0, units: 0 }
+      );
+      const returnedTotals = getReturnedItemTotals(order);
+      const revenue = roundMoney(soldTotals.revenue - returnedTotals.revenue);
+      const cost = roundMoney(soldTotals.cost - returnedTotals.cost);
+      const units = Math.max(0, soldTotals.units - returnedTotals.units);
+      const profit = roundMoney(revenue - cost);
+      const date = toChartDate(order.createdAt);
+
+      summary.revenue = roundMoney(summary.revenue + revenue);
+      summary.cost = roundMoney(summary.cost + cost);
+      summary.profit = roundMoney(summary.profit + profit);
+      summary.unitsSold += units;
+      summary.orderCount += 1;
+
+      const point = byDate.get(date) || { date, revenue: 0, cost: 0, profit: 0 };
+      point.revenue = roundMoney(point.revenue + revenue);
+      point.cost = roundMoney(point.cost + cost);
+      point.profit = roundMoney(point.profit + profit);
+      byDate.set(date, point);
+    }
+
+    summary.points = [...byDate.values()];
+    res.json(summary);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

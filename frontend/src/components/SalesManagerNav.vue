@@ -7,6 +7,7 @@
       <div class="links">
         <router-link to="/sales" class="nav-link">Dashboard</router-link>
         <router-link to="/sales/pricing" class="nav-link">Pricing</router-link>
+        <router-link to="/sales/analytics" class="nav-link">Analytics</router-link>
         <router-link to="/sales/invoices" class="nav-link">Invoices</router-link>
         <router-link to="/sales/refunds" class="nav-link">Refund Requests</router-link>
       </div>
