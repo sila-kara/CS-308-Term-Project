@@ -6,6 +6,7 @@ const Product = require("../models/Product");
 const User = require("../models/User");
 const {
   createOrder,
+  getSalesAnalytics,
   getSalesInvoices,
   approveReturn,
   refundReturn,
@@ -141,6 +142,7 @@ test("createOrder recalculates totals from DB prices and creates a processing or
     name: "Clean Code",
     quantity: 5,
     price: 250,
+    cost: 140,
   });
   Product.findOneAndUpdate = async (...args) => {
     atomicUpdates.push(args);
@@ -180,6 +182,7 @@ test("createOrder recalculates totals from DB prices and creates a processing or
       productId: "product-1",
       name: "Clean Code",
       price: 250,
+      cost: 140,
       quantity: 2,
     },
   ]);
@@ -202,8 +205,8 @@ test("createOrder rolls back stock when an atomic decrement fails", async () => 
   const atomicUpdates = [];
   const rollbackUpdates = [];
   const products = {
-    "product-1": { _id: "product-1", name: "Clean Code", quantity: 5, price: 250 },
-    "product-2": { _id: "product-2", name: "1984", quantity: 3, price: 65 },
+    "product-1": { _id: "product-1", name: "Clean Code", quantity: 5, price: 250, cost: 140 },
+    "product-2": { _id: "product-2", name: "1984", quantity: 3, price: 65, cost: 30 },
   };
 
   Product.findById = async (id) => products[id] || null;
@@ -258,6 +261,7 @@ test("createOrder uses active discounted DB price at checkout", async () => {
     name: "Clean Code",
     quantity: 5,
     price: 200,
+    cost: 120,
     discountRate: 20,
     discountedPrice: 160,
     discountStartDate: new Date(Date.now() - 1000),
@@ -286,9 +290,99 @@ test("createOrder uses active discounted DB price at checkout", async () => {
 
   assert.equal(res.statusCode, 201);
   assert.equal(res.body.items[0].price, 160);
+  assert.equal(res.body.items[0].cost, 120);
   assert.equal(res.body.subtotal, 320);
   assert.equal(res.body.tax, 32);
   assert.equal(res.body.total, 352);
+});
+
+test("getSalesAnalytics calculates revenue, cost, and profit for a date range", async () => {
+  const originalFind = Order.find;
+  let filterUsed;
+
+  Order.find = (filter) => {
+    filterUsed = filter;
+    return {
+      sort() {
+        return this;
+      },
+      async populate() {
+        return [
+          {
+            _id: "order-1",
+            createdAt: new Date("2026-05-20T10:00:00.000Z"),
+            status: "delivered",
+            returnStatus: null,
+            items: [
+              { productId: "product-1", name: "Clean Code", price: 200, cost: 120, quantity: 2 },
+            ],
+          },
+          {
+            _id: "order-2",
+            createdAt: new Date("2026-05-21T10:00:00.000Z"),
+            status: "processing",
+            returnStatus: "refunded",
+            returnItems: ["product-2"],
+            items: [
+              { productId: "product-2", name: "1984", price: 80, cost: 50, quantity: 1 },
+            ],
+          },
+        ];
+      },
+    };
+  };
+
+  const req = {
+    query: {
+      startDate: "2026-05-20",
+      endDate: "2026-05-21",
+    },
+  };
+  const res = makeRes();
+
+  try {
+    await getSalesAnalytics(req, res);
+  } finally {
+    Order.find = originalFind;
+  }
+
+  assert.equal(res.statusCode, 200);
+  assert.equal(filterUsed.status.$ne, "cancelled");
+  assert.ok(filterUsed.createdAt.$gte instanceof Date);
+  assert.ok(filterUsed.createdAt.$lte instanceof Date);
+  assert.equal(res.body.revenue, 400);
+  assert.equal(res.body.cost, 240);
+  assert.equal(res.body.profit, 160);
+  assert.equal(res.body.orderCount, 2);
+  assert.equal(res.body.unitsSold, 2);
+  assert.deepEqual(res.body.points, [
+    { date: "2026-05-20", revenue: 400, cost: 240, profit: 160 },
+    { date: "2026-05-21", revenue: 0, cost: 0, profit: 0 },
+  ]);
+});
+
+test("getSalesAnalytics rejects invalid date ranges", async () => {
+  const originalFind = Order.find;
+  Order.find = () => {
+    throw new Error("Order.find should not be called");
+  };
+
+  const req = {
+    query: {
+      startDate: "2026-05-22",
+      endDate: "2026-05-01",
+    },
+  };
+  const res = makeRes();
+
+  try {
+    await getSalesAnalytics(req, res);
+  } finally {
+    Order.find = originalFind;
+  }
+
+  assert.equal(res.statusCode, 400);
+  assert.deepEqual(res.body, { message: "Invalid analytics date range" });
 });
 
 test("getSalesInvoices filters invoices by selected date range", async () => {
