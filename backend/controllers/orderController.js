@@ -384,6 +384,7 @@ exports.advanceStatus = async (req, res) => {
       return res.status(400).json({ message: "Order already delivered" });
 
     order.status = STATUS_SEQUENCE[currentIndex + 1];
+    if (order.status === "delivered") order.deliveredAt = new Date();
     await order.save();
 
     try {
@@ -434,7 +435,8 @@ exports.requestReturn = async (req, res) => {
     if (order.returnStatus)
       return res.status(400).json({ message: "A return has already been requested for this order." });
 
-    const daysSinceDelivery = (Date.now() - new Date(order.updatedAt)) / (1000 * 60 * 60 * 24);
+    const deliveryDate = order.deliveredAt || order.updatedAt;
+    const daysSinceDelivery = (Date.now() - new Date(deliveryDate)) / (1000 * 60 * 60 * 24);
     if (daysSinceDelivery > 30)
       return res.status(400).json({ message: "Return window has expired (30 days)." });
 

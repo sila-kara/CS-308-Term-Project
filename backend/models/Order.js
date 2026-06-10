@@ -31,6 +31,7 @@ const orderSchema = new mongoose.Schema({
   returnItems: [{ type: String }],
   returnReason: { type: String, default: "" },
   returnPhoto: { type: String, default: null },
+  deliveredAt: { type: Date, default: null },
   returnRequestedAt: { type: Date, default: null },
   returnApprovedAt: { type: Date, default: null },
   returnRefundedAt: { type: Date, default: null },
