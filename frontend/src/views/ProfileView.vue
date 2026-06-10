@@ -58,6 +58,10 @@
           <h2>Personal information</h2>
           <form @submit.prevent="saveProfile">
             <div class="field">
+              <label>Customer ID</label>
+              <input :value="user._id || user.id" disabled class="disabled" />
+            </div>
+            <div class="field">
               <label>Full name</label>
               <input v-model="form.name" type="text" required />
             </div>
@@ -66,8 +70,17 @@
               <input :value="user.email" type="email" disabled class="disabled" />
             </div>
             <div class="field">
+              <label>Tax ID</label>
+              <input :value="user.taxId || '—'" disabled class="disabled" />
+            </div>
+            <div class="field">
               <label>Delivery address</label>
               <textarea v-model="form.address" rows="3" placeholder="Street, city, postal code…" />
+            </div>
+            <div class="field">
+              <label>Password</label>
+              <input value="••••••••" disabled class="disabled" />
+              <span class="field-hint">🔒 Stored as a secure bcrypt hash — never visible in plain text.</span>
             </div>
             <p v-if="profileMsg" :class="['msg', profileMsgType]">{{ profileMsg }}</p>
             <button class="btn primary" type="submit" :disabled="profileSaving">
@@ -353,6 +366,7 @@ form { display: grid; gap: 14px; }
 }
 .field textarea { resize: vertical; }
 .disabled { background: #f8fafc; color: #94a3b8; cursor: not-allowed; }
+.field-hint { font-size: 0.78rem; color: #64748b; margin-top: 2px; }
 
 .btn { padding: 11px 20px; border-radius: 8px; font-weight: 700; cursor: pointer; border: none; font-size: 0.9rem; justify-self: start; }
 .btn.primary { background: #2563eb; color: #fff; }
