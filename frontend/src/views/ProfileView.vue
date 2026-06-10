@@ -71,7 +71,7 @@
             </div>
             <div class="field">
               <label>Tax ID</label>
-              <input :value="user.taxId || '—'" disabled class="disabled" />
+              <input v-model="form.taxId" type="text" placeholder="e.g. 1234567890" />
             </div>
             <div class="field">
               <label>Delivery address</label>
@@ -152,7 +152,7 @@ const initials = computed(() => {
   return n.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2) || "?";
 });
 
-const form = reactive({ name: "", address: "" });
+const form = reactive({ name: "", address: "", taxId: "" });
 const profileSaving = ref(false);
 const profileMsg = ref("");
 const profileMsgType = ref("success");
@@ -168,6 +168,7 @@ onMounted(async () => {
     user.value = data;
     form.name = data.name || "";
     form.address = data.address || "";
+    form.taxId = data.taxId || "";
     if (data.avatar) {
       const preset = AVATAR_OPTIONS.find(o => o.id === data.avatar);
       if (preset) {
@@ -219,7 +220,7 @@ async function saveProfile() {
   profileSaving.value = true;
   profileMsg.value = "";
   try {
-    const { data } = await api.patch("/auth/me", { name: form.name, address: form.address });
+    const { data } = await api.patch("/auth/me", { name: form.name, address: form.address, taxId: form.taxId });
     user.value = { ...user.value, ...data };
     if (authState.user) authState.user.name = data.name;
     profileMsg.value = "Changes saved!";

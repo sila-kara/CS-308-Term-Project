@@ -131,13 +131,14 @@ exports.getMe = async (req, res) => {
 
 exports.updateMe = async (req, res) => {
   try {
-    const { name, address, avatar, currentPassword, newPassword } = req.body;
+    const { name, address, avatar, taxId, currentPassword, newPassword } = req.body;
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
     if (name) user.name = name;
     if (address !== undefined) user.address = address;
     if (avatar !== undefined) user.avatar = avatar;
+    if (taxId !== undefined) user.taxId = encrypt(taxId);
 
     if (newPassword) {
       if (!currentPassword)
@@ -150,6 +151,7 @@ exports.updateMe = async (req, res) => {
 
     await user.save();
     const { password: _, ...safe } = user.toObject();
+    if (safe.taxId) safe.taxId = decrypt(safe.taxId);
     res.json(safe);
   } catch (err) {
     res.status(500).json({ message: err.message });
