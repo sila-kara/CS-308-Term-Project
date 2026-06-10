@@ -61,9 +61,9 @@
             </button>
             <span v-else-if="order.status === 'delivered'" class="delivered-tag">✅ Delivered</span>
             <span v-else-if="order.status === 'cancelled'" class="cancelled-tag">🚫 Cancelled</span>
-            <a :href="`/api/orders/admin/invoices/${order._id}/pdf`" target="_blank" class="invoice-btn">
+            <button type="button" class="invoice-btn" @click="openInvoice(order._id)">
               View Invoice
-            </a>
+            </button>
           </div>
         </div>
       </template>
@@ -121,11 +121,7 @@
                       </button>
                       <span v-else-if="order.status === 'delivered'" class="delivered-tag">✅</span>
                       <span v-else class="cancelled-tag">🚫</span>
-                      <a
-                        :href="`/api/orders/admin/invoices/${order._id}/pdf`"
-                        target="_blank"
-                        class="invoice-btn"
-                      >Invoice</a>
+                      <button type="button" class="invoice-btn" @click="openInvoice(order._id)">Invoice</button>
                     </div>
                   </td>
                 </tr>
@@ -199,6 +195,17 @@ async function advance(order) {
 
 function formatDate(d) {
   return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+}
+
+async function openInvoice(orderId) {
+  try {
+    const response = await api.get(`/orders/admin/invoices/${orderId}/pdf`, { responseType: "blob" });
+    const url = URL.createObjectURL(new Blob([response.data], { type: "application/pdf" }));
+    window.open(url, "_blank");
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (e) {
+    alert("Failed to load invoice.");
+  }
 }
 
 onMounted(loadOrders);
