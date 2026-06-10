@@ -57,8 +57,8 @@ test("updatePricing calculates and persists discounted price", async () => {
       price: 200,
       cost: 120,
       discountRate: 15,
-      discountStartDate: "2026-05-01",
-      discountEndDate: "2026-05-31",
+      discountStartDate: new Date(Date.now() - 86400000).toISOString().slice(0, 10),
+      discountEndDate: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
     },
   };
   const res = makeRes();
