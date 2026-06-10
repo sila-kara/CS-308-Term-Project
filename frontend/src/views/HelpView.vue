@@ -40,7 +40,7 @@ const faqs = [
   },
   {
     q: "How do I return a book?",
-    a: "You may request a return within 14 days of receiving your order. Email us at bookworld.store.cs308@gmail.com with your order number and reason. Books must be in their original, unread condition."
+    a: "You may request a return within 30 days of receiving your order. Email us at bookworld.store.cs308@gmail.com with your order number and reason. Books must be in their original, unread condition."
   },
   {
     q: "When will I receive my refund?",
