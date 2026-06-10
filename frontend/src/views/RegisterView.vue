@@ -22,6 +22,14 @@
             required
           />
         </label>
+        <label>
+          <span>Tax ID <span class="optional">(optional)</span></span>
+          <input v-model="taxId" type="text" autocomplete="off" placeholder="e.g. 1234567890" />
+        </label>
+        <label>
+          <span>Home address <span class="optional">(optional)</span></span>
+          <textarea v-model="address" rows="2" placeholder="Street, city, postal code…" />
+        </label>
         <p v-if="error" class="error">{{ error }}</p>
         <button class="btn primary" type="submit">Register</button>
       </form>
@@ -45,6 +53,8 @@ const { register } = useAuthStore();
 const name = ref("");
 const email = ref("");
 const password = ref("");
+const taxId = ref("");
+const address = ref("");
 const error = ref("");
 
 async function onSubmit() {
@@ -53,6 +63,8 @@ async function onSubmit() {
     name: name.value,
     email: email.value,
     password: password.value,
+    taxId: taxId.value,
+    address: address.value,
   });
   if (!res.ok) {
     error.value = res.error;
@@ -102,11 +114,18 @@ label {
   color: #334155;
 }
 
-input {
+input, textarea {
   border: 1px solid #cfdbea;
   border-radius: 10px;
   padding: 10px 12px;
   font-size: 1rem;
+  resize: vertical;
+}
+
+.optional {
+  font-weight: 400;
+  color: #94a3b8;
+  font-size: 0.8rem;
 }
 
 .error {
