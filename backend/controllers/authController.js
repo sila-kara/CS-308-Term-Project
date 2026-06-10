@@ -3,6 +3,7 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
 const User = require("../models/User");
+const { encrypt, decrypt } = require("../utils/encrypt");
 
 function signToken(user) {
   return jwt.sign(
@@ -22,7 +23,7 @@ exports.register = async (req, res) => {
       return res.status(409).json({ message: "Email already registered" });
 
     const hashed = await bcrypt.hash(password, 10);
-    const user = await User.create({ name, email, password: hashed, taxId, address });
+    const user = await User.create({ name, email, password: hashed, taxId: encrypt(taxId), address });
 
     res.status(201).json({ token: signToken(user), user: { id: user._id, name: user.name, email: user.email, role: user.role } });
   } catch (err) {
@@ -120,7 +121,9 @@ exports.getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
-    res.json(user);
+    const userData = user.toObject();
+    if (userData.taxId) userData.taxId = decrypt(userData.taxId);
+    res.json(userData);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
