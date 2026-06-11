@@ -253,7 +253,10 @@ async function loadReviewEligibility(productId) {
 
 async function loadProductDetail(id) {
   product.value = await fetchProductById(id);
-  if (!product.value) return;
+  if (!product.value || product.value.isDeleted) {
+    product.value = null;
+    return;
+  }
 
   const productId = product.value._id || product.value.id;
   await fetchApprovedForProduct(productId);

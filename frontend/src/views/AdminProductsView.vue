@@ -88,17 +88,31 @@
     <section class="panel">
       <div class="section-head">
         <h2>Inventory</h2>
-        <span>{{ productsState.products.length }} products</span>
+        <div class="inventory-meta">
+          <span>{{ inventoryProducts.length }} products shown</span>
+          <label class="show-deleted-toggle">
+            <input v-model="showDeletedProducts" type="checkbox" />
+            Show deleted products
+          </label>
+        </div>
       </div>
 
       <div v-if="productsState.loading" class="state">Loading products...</div>
       <div v-else-if="productsState.error" class="state error">{{ productsState.error }}</div>
       <div v-else class="product-list">
-        <article v-for="product in productsState.products" :key="product.id" class="product-row">
+        <article
+          v-for="product in inventoryProducts"
+          :key="product.id"
+          class="product-row"
+          :class="{ 'is-deleted': product.isDeleted }"
+        >
           <img :src="product.image || placeholderImage" :alt="product.name" class="cover" />
           <div class="product-main">
             <p class="category">{{ product.category || "Uncategorized" }}</p>
-            <h3>{{ product.name }}</h3>
+            <h3>
+              {{ product.name }}
+              <span v-if="product.isDeleted" class="deleted-badge">Deleted</span>
+            </h3>
             <p class="meta">{{ product.model }} · {{ product.serialNumber }}</p>
             <p class="meta">Distributor: {{ product.distributor || "-" }}</p>
           </div>
@@ -114,7 +128,12 @@
             <button class="secondary-btn" type="button" @click="openEditModal(product)">
               Edit
             </button>
-            <button class="danger-btn" type="button" @click="removeProduct(product)">
+            <button
+              class="danger-btn"
+              type="button"
+              :disabled="product.isDeleted"
+              @click="removeProduct(product)"
+            >
               Delete
             </button>
           </div>
@@ -161,7 +180,7 @@
 
 <script setup>
 defineOptions({ name: "AdminProductsView" });
-import { onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useCategoriesStore } from "../stores/categories";
 import { useProductsStore } from "../stores/products";
 
@@ -211,6 +230,12 @@ const editForm = reactive({
   name: "",
   description: "",
   category: "",
+});
+const showDeletedProducts = ref(false);
+
+const inventoryProducts = computed(() => {
+  if (showDeletedProducts.value) return productsState.products;
+  return productsState.products.filter((product) => !product.isDeleted);
 });
 
 function resetProductForm() {
@@ -388,6 +413,37 @@ h2 {
 .section-head span {
   color: #64748b;
   font-size: 0.86rem;
+}
+.inventory-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.show-deleted-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.deleted-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.product-row.is-deleted {
+  background: #f8fafc;
+  opacity: 0.88;
 }
 .product-form {
   display: grid;

@@ -263,10 +263,10 @@ import { useProductsStore } from "../stores/products.js";
 import ProductCard from "../components/ProductCard.vue";
 import { isOnSale } from "../utils/productUtils";
 
-const { state: productsState, fetchProducts } = useProductsStore();
-const products = productsState.products;
+const { state: productsState, fetchProducts, listCatalogProducts } = useProductsStore();
+const catalogProducts = computed(() => listCatalogProducts());
 const categories = computed(() => {
-  const cats = [...new Set(productsState.products.map((p) => p.category))].filter(Boolean).sort();
+  const cats = [...new Set(catalogProducts.value.map((p) => p.category))].filter(Boolean).sort();
   return ["All", ...cats];
 });
 
@@ -288,13 +288,13 @@ let heroAutoplayId = null;
 let heroAutoplayPaused = false;
 
 const carouselBestsellerBooks = computed(() =>
-  [...products].sort((a, b) => b.ratingCount - a.ratingCount).slice(0, 3),
+  [...catalogProducts.value].sort((a, b) => b.ratingCount - a.ratingCount).slice(0, 3),
 );
 const carouselNewBooks = computed(() =>
-  [...products].sort((a, b) => b.id - a.id).slice(0, 3),
+  [...catalogProducts.value].sort((a, b) => b.id - a.id).slice(0, 3),
 );
 const carouselDealBooks = computed(() =>
-  [...products].sort((a, b) => a.price - b.price).slice(0, 3),
+  [...catalogProducts.value].sort((a, b) => a.price - b.price).slice(0, 3),
 );
 
 function prevHeroSlide() {
@@ -471,7 +471,7 @@ const heroSlides = computed(() => [
 
 
 const filteredProducts = computed(() => {
-  let result = [...products];
+  let result = [...catalogProducts.value];
 
   if (sortBy.value === "sale") {
     result = result.filter(isOnSale);
@@ -525,7 +525,7 @@ const filteredProducts = computed(() => {
 const featuredBooks = computed(() => {
   // Pick the top-rated book from each category for variety
   const byCategory = {};
-  for (const p of products) {
+  for (const p of catalogProducts.value) {
     const cat = p.category || "Other";
     if (!byCategory[cat] || p.rating > byCategory[cat].rating) {
       byCategory[cat] = p;
@@ -534,7 +534,7 @@ const featuredBooks = computed(() => {
   const picks = Object.values(byCategory).sort((a, b) => b.rating - a.rating).slice(0, 5);
   if (picks.length < 5) {
     const ids = new Set(picks.map(p => p.id));
-    const extras = [...products]
+    const extras = [...catalogProducts.value]
       .filter(p => !ids.has(p.id))
       .sort((a, b) => b.rating - a.rating);
     picks.push(...extras.slice(0, 5 - picks.length));

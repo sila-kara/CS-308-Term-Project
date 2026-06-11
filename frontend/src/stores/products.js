@@ -12,9 +12,14 @@ function normalize(p) {
   return {
     ...p,
     id: p._id,
+    isDeleted: Boolean(p.isDeleted),
     categoryId: p.category?._id ?? p.category ?? "",
     category: p.category?.name ?? p.category ?? "",
   };
+}
+
+function listCatalogProducts() {
+  return state.products.filter((product) => !product.isDeleted);
 }
 
 async function fetchProducts() {
@@ -78,10 +83,12 @@ async function updateProduct(id, payload) {
 }
 
 async function deleteProduct(id) {
-  await api.delete(`/products/${id}`);
+  const { data } = await api.delete(`/products/${id}`);
   const index = state.products.findIndex((product) => product.id === id);
   if (index !== -1) {
-    state.products.splice(index, 1);
+    state.products[index] = data?.product
+      ? normalize(data.product)
+      : { ...state.products[index], isDeleted: true };
   }
 }
 
@@ -90,6 +97,7 @@ export function useProductsStore() {
     state,
     fetchProducts,
     fetchProductById,
+    listCatalogProducts,
     updatePricing,
     createProduct,
     updateStock,

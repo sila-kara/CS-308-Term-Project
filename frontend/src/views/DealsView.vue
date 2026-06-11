@@ -62,7 +62,7 @@ import { useProductsStore } from "../stores/products.js";
 import { useCartStore } from "../stores/cart";
 
 const router = useRouter();
-const { state: productsState, fetchProducts } = useProductsStore();
+const { state: productsState, fetchProducts, listCatalogProducts } = useProductsStore();
 const { addToCart } = useCartStore();
 
 const loading = ref(true);
@@ -80,7 +80,7 @@ function discountRate(count) {
 }
 
 const bundles = computed(() => {
-  const products = productsState.products;
+  const products = listCatalogProducts();
   const result = [];
 
   // Group by author (distributor) — only authors with 2+ books

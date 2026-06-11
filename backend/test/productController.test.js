@@ -394,8 +394,8 @@ test("createProduct keeps pricing under sales manager control", async () => {
 });
 
 test("deleteProduct returns a not-found response for missing products", async () => {
-  const originalFindByIdAndDelete = Product.findByIdAndDelete;
-  Product.findByIdAndDelete = async () => null;
+  const originalFindById = Product.findById;
+  Product.findById = async () => null;
 
   const req = { params: { id: "missing-product" } };
   const res = makeRes();
@@ -403,7 +403,7 @@ test("deleteProduct returns a not-found response for missing products", async ()
   try {
     await deleteProduct(req, res);
   } finally {
-    Product.findByIdAndDelete = originalFindByIdAndDelete;
+    Product.findById = originalFindById;
   }
 
   assert.equal(res.statusCode, 404);

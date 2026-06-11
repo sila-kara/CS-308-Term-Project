@@ -319,12 +319,19 @@ exports.updateProduct = async (req, res) => {
 
 exports.deleteProduct = async (req, res) => {
   try {
-    const product = await Product.findByIdAndDelete(req.params.id);
+    const product = await Product.findById(req.params.id);
     if (!product) {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    res.json({ message: "Product deleted" });
+    product.isDeleted = true;
+    await product.save();
+    await product.populate("category");
+
+    res.json({
+      message: "Product deleted",
+      product: withPricingView(product),
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
