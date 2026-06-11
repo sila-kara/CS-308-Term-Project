@@ -6,8 +6,8 @@
     <div v-if="loading" style="text-align:center;padding:40px;color:#64748b">Loading…</div>
 
     <template v-else>
-      <p v-if="pending.length === 0" class="empty">No pending reviews. 🎉</p>
-      <ul v-else class="list">
+      <p v-if="pending.length === 0 && rejectedDisplay.length === 0" class="empty">No pending reviews. 🎉</p>
+      <ul v-if="pending.length" class="list">
         <li v-for="item in pending" :key="item._id">
           <div>
             <p class="title">
@@ -19,6 +19,17 @@
           <div class="actions">
             <button type="button" class="ok" :disabled="busy[item._id]" @click="approve(item._id)">Approve</button>
             <button type="button" class="no" :disabled="busy[item._id]" @click="reject(item._id)">Reject</button>
+          </div>
+        </li>
+      </ul>
+      <ul v-if="rejectedDisplay.length" class="list rejected-list">
+        <li v-for="item in rejectedDisplay" :key="item._id" class="rejected-item">
+          <div>
+            <p class="title">
+              {{ item.maskedUserName }} · <span class="stars">{{ "★".repeat(item.rating) }}</span> · <em>{{ item.productName }}</em>
+            </p>
+            <p class="text removed">Comment removed</p>
+            <p class="meta">{{ formatDate(item.createdAt) }}</p>
           </div>
         </li>
       </ul>
@@ -36,6 +47,7 @@ const { fetchPending, listPending, approveReview, rejectReview } = useCommentsSt
 const loading = ref(false);
 const busy = reactive({});
 const pending = ref([]);
+const rejectedDisplay = ref([]);
 
 async function load() {
   loading.value = true;
@@ -53,7 +65,14 @@ async function approve(id) {
 
 async function reject(id) {
   busy[id] = true;
-  await rejectReview(id);
+  const item = pending.value.find((entry) => entry._id === id);
+  const ok = await rejectReview(id);
+  if (ok && item) {
+    rejectedDisplay.value = [
+      { ...item, commentText: "" },
+      ...rejectedDisplay.value.filter((entry) => entry._id !== id),
+    ];
+  }
   pending.value = listPending();
   busy[id] = false;
 }
@@ -89,7 +108,11 @@ onMounted(load);
   padding: 12px;
 }
 .title { margin: 0; font-weight: 800; font-size: 0.9rem; }
+.stars { color: #f59e0b; letter-spacing: 1px; }
 .text { margin: 6px 0; color: #334155; }
+.text.removed { color: #94a3b8; font-style: italic; }
+.rejected-list { margin-top: 16px; }
+.rejected-item { background: #f8fafc; }
 .meta { margin: 0; font-size: 0.78rem; color: #94a3b8; }
 .actions { display: grid; gap: 8px; align-content: start; }
 .ok {

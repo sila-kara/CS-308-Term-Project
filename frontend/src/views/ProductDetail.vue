@@ -116,6 +116,9 @@
           <p v-if="r.commentStatus === 'approved' && r.commentText">
             {{ r.commentText }}
           </p>
+          <p v-else-if="r.commentStatus === 'rejected'" class="comment-removed">
+            [Comment removed by moderator]
+          </p>
         </li>
       </ul>
       <p v-else class="no-reviews">No reviews yet. Be the first.</p>
@@ -547,6 +550,13 @@ async function submitReview() {
 .stars-mini {
   color: #f59e0b;
   letter-spacing: 1px;
+}
+
+.comment-removed {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.88rem;
+  font-style: italic;
 }
 
 .no-reviews {
