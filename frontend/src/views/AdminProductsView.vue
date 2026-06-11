@@ -3,6 +3,7 @@
     <header class="page-head">
       <h1>Products & Stock</h1>
       <p>Add and remove products, manage categories, and update stock quantities. Prices and discounts are handled by Sales Manager.</p>
+      <p v-if="editSuccess" class="success-banner">{{ editSuccess }}</p>
     </header>
 
     <section class="panel">
@@ -110,6 +111,9 @@
             <button class="secondary-btn" type="button" :disabled="savingStock[product.id]" @click="saveStock(product)">
               Save stock
             </button>
+            <button class="secondary-btn" type="button" @click="openEditModal(product)">
+              Edit
+            </button>
             <button class="danger-btn" type="button" @click="removeProduct(product)">
               Delete
             </button>
@@ -117,6 +121,41 @@
         </article>
       </div>
     </section>
+
+    <div v-if="editingProduct" class="edit-modal" role="dialog" aria-modal="true" @click.self="closeEditModal">
+      <div class="edit-panel">
+        <header class="edit-panel-head">
+          <h2>Edit product</h2>
+          <button type="button" class="close-btn" @click="closeEditModal">Close</button>
+        </header>
+        <form class="edit-form" @submit.prevent="submitEdit">
+          <label>
+            Name
+            <input v-model.trim="editForm.name" required />
+          </label>
+          <label>
+            Category
+            <select v-model="editForm.category" required>
+              <option value="" disabled>Select category</option>
+              <option v-for="category in categoriesState.categories" :key="category._id" :value="category._id">
+                {{ category.name }}
+              </option>
+            </select>
+          </label>
+          <label class="wide">
+            Description
+            <textarea v-model.trim="editForm.description" rows="4" required />
+          </label>
+          <p v-if="editError" class="error">{{ editError }}</p>
+          <div class="edit-actions">
+            <button type="button" class="secondary-btn" @click="closeEditModal">Cancel</button>
+            <button class="primary-btn" type="submit" :disabled="savingEdit">
+              {{ savingEdit ? "Saving..." : "Save changes" }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -131,6 +170,7 @@ const {
   fetchProducts,
   createProduct,
   updateStock,
+  updateProduct,
   deleteProduct,
 } = useProductsStore();
 const {
@@ -163,6 +203,15 @@ const savingProduct = ref(false);
 const savingCategory = ref(false);
 const savingStock = reactive({});
 const stockDrafts = reactive({});
+const editingProduct = ref(null);
+const savingEdit = ref(false);
+const editError = ref("");
+const editSuccess = ref("");
+const editForm = reactive({
+  name: "",
+  description: "",
+  category: "",
+});
 
 function resetProductForm() {
   productForm.name = "";
@@ -209,6 +258,52 @@ async function submitCategory() {
     categoryError.value = e.response?.data?.message || "Failed to add category.";
   } finally {
     savingCategory.value = false;
+  }
+}
+
+function resolveCategoryId(product) {
+  if (product.categoryId) return product.categoryId;
+  const match = categoriesState.categories.find((category) => category.name === product.category);
+  return match?._id ?? "";
+}
+
+function openEditModal(product) {
+  editingProduct.value = product;
+  editError.value = "";
+  editForm.name = product.name || "";
+  editForm.description = product.description || "";
+  editForm.category = resolveCategoryId(product);
+}
+
+function closeEditModal() {
+  editingProduct.value = null;
+  editError.value = "";
+  editForm.name = "";
+  editForm.description = "";
+  editForm.category = "";
+}
+
+async function submitEdit() {
+  if (!editingProduct.value) return;
+  savingEdit.value = true;
+  editError.value = "";
+  try {
+    await updateProduct(editingProduct.value.id, {
+      name: editForm.name,
+      description: editForm.description,
+      category: editForm.category,
+    });
+    await fetchProducts();
+    syncStockDrafts();
+    closeEditModal();
+    editSuccess.value = "Product updated successfully.";
+    window.setTimeout(() => {
+      editSuccess.value = "";
+    }, 4000);
+  } catch (e) {
+    editError.value = e.response?.data?.message || "Failed to update product.";
+  } finally {
+    savingEdit.value = false;
   }
 }
 
@@ -263,6 +358,14 @@ h1 { margin: 0 0 8px; font-size: 1.85rem; }
   margin: 0;
   color: #64748b;
   line-height: 1.5;
+}
+.success-banner {
+  margin-top: 12px !important;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #dcfce7;
+  color: #166534;
+  font-weight: 700;
 }
 .panel {
   background: #fff;
@@ -405,9 +508,58 @@ h3 { margin: 0 0 4px; font-size: 1rem; }
 }
 .stock-controls {
   display: grid;
-  grid-template-columns: 100px auto auto;
+  grid-template-columns: 100px auto auto auto;
   gap: 8px;
   align-items: end;
+}
+.edit-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.45);
+}
+.edit-panel {
+  width: min(520px, 100%);
+  background: #fff;
+  border: 1px solid #dbe5f1;
+  border-radius: 10px;
+  padding: 18px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+.edit-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.edit-panel-head h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+.close-btn {
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 7px 10px;
+  background: #fff;
+  color: #334155;
+  font-weight: 700;
+  cursor: pointer;
+}
+.edit-form {
+  display: grid;
+  gap: 10px;
+}
+.edit-form .wide {
+  grid-column: 1 / -1;
+}
+.edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 @media (max-width: 900px) {
   .product-form { grid-template-columns: repeat(2, minmax(150px, 1fr)); }

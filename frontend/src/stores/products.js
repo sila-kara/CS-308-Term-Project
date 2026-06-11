@@ -67,6 +67,16 @@ async function updateStock(id, quantity) {
   return normalized;
 }
 
+async function updateProduct(id, payload) {
+  const { data } = await api.put(`/products/${id}`, payload);
+  const normalized = normalize(data);
+  const index = state.products.findIndex((product) => product.id === normalized.id);
+  if (index !== -1) {
+    state.products[index] = normalized;
+  }
+  return normalized;
+}
+
 async function deleteProduct(id) {
   await api.delete(`/products/${id}`);
   const index = state.products.findIndex((product) => product.id === id);
@@ -83,6 +93,7 @@ export function useProductsStore() {
     updatePricing,
     createProduct,
     updateStock,
+    updateProduct,
     deleteProduct,
   };
 }

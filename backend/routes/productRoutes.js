@@ -3,6 +3,7 @@ const {
   getProducts,
   getProductById,
   createProduct,
+  updateProduct,
   deleteProduct,
   updatePricing,
   updateStock,
@@ -16,6 +17,12 @@ router.post(
   authMiddleware,
   requireRole("product_manager"),
   createProduct
+);
+router.put(
+  "/:id",
+  authMiddleware,
+  requireRole("product_manager"),
+  updateProduct
 );
 router.delete(
   "/:id",
