@@ -123,8 +123,8 @@
       </ul>
       <p v-else class="no-reviews">No reviews yet. Be the first.</p>
 
-      <div v-if="isLoggedIn && canReview" class="review-form">
-        <h3>{{ myReview ? "Edit your review" : "Write a review" }}</h3>
+      <div v-if="showReviewForm" class="review-form">
+        <h3>{{ isEditingReview ? "Edit your review" : "Write a review" }}</h3>
         <label>
           Rating
           <select v-model.number="draftRating">
@@ -138,10 +138,21 @@
         <p v-if="reviewError" class="review-error">{{ reviewError }}</p>
         <p v-if="reviewSuccess" class="review-success">{{ reviewSuccess }}</p>
         <button type="button" class="submit-review" @click="submitReview">
-          {{ myReview ? "Update review" : "Submit review" }}
+          {{ isEditingReview ? "Update review" : "Submit review" }}
         </button>
       </div>
-      <p v-else class="login-hint">
+      <div v-else-if="isLoggedIn && myReview" class="review-already">
+        <p class="already-reviewed-note">You have already reviewed this product.</p>
+        <button
+          v-if="canEditReview"
+          type="button"
+          class="edit-review"
+          @click="startEditingReview"
+        >
+          Edit
+        </button>
+      </div>
+      <p v-else-if="!isLoggedIn" class="login-hint">
         <router-link to="/login">Sign in</router-link>
         to submit a rating and comment.
       </p>
@@ -183,6 +194,19 @@ const isWishlisted = computed(() => product.value ? isInWishlist(product.value._
 const product = ref(null);
 const myReview = ref(null);
 const canReview = ref(false);
+const isEditingReview = ref(false);
+
+const canEditReview = computed(() => {
+  if (!myReview.value) return false;
+  return (myReview.value.editCount ?? 0) < 1;
+});
+
+const showReviewForm = computed(() => {
+  if (!isLoggedIn.value) return false;
+  if (myReview.value && !isEditingReview.value) return false;
+  if (!myReview.value && !canReview.value) return false;
+  return true;
+});
 const hasDiscount = computed(() => isOnSale(product.value));
 const displayPrice = computed(() => effectivePrice(product.value));
 
@@ -198,6 +222,7 @@ const cartMessage = ref("");
 
 async function loadMyReview(productId) {
   myReview.value = null;
+  isEditingReview.value = false;
   draftText.value = "";
   draftRating.value = 5;
 
@@ -209,6 +234,15 @@ async function loadMyReview(productId) {
     draftRating.value = my.rating;
     draftText.value = my.commentText || "";
   }
+}
+
+function startEditingReview() {
+  if (!canEditReview.value || !myReview.value) return;
+  isEditingReview.value = true;
+  draftRating.value = myReview.value.rating;
+  draftText.value = myReview.value.commentText || "";
+  reviewError.value = "";
+  reviewSuccess.value = "";
 }
 
 async function loadReviewEligibility(productId) {
@@ -235,6 +269,7 @@ watch(
   async (id) => {
     reviewError.value = "";
     reviewSuccess.value = "";
+    isEditingReview.value = false;
     await loadProductDetail(id);
   },
 );
@@ -261,16 +296,25 @@ async function submitReview() {
     reviewError.value = res.error;
     return;
   }
+  const wasEditing = isEditingReview.value;
   const hasText = draftText.value.trim().length > 0;
   reviewSuccess.value = hasText
     ? "Thanks! Your review will appear after a product manager approves it."
     : "Thanks! Your rating has been submitted.";
+
+  isEditingReview.value = false;
 
   // Refetch product to get updated rating/ratingCount
   const updated = await fetchProductById(product.value._id || product.value.id);
   if (updated) product.value = updated;
   await fetchApprovedForProduct(product.value._id || product.value.id);
   await loadMyReview(product.value._id || product.value.id);
+  if (wasEditing && myReview.value) {
+    myReview.value = {
+      ...myReview.value,
+      editCount: Math.max(myReview.value.editCount ?? 0, 1),
+    };
+  }
 }
 </script>
 
@@ -616,6 +660,34 @@ async function submitReview() {
   color: white;
   font-weight: 700;
   cursor: pointer;
+}
+
+.review-already {
+  display: grid;
+  gap: 10px;
+  max-width: 520px;
+}
+
+.already-reviewed-note {
+  margin: 0;
+  font-size: 0.88rem;
+  color: #64748b;
+}
+
+.edit-review {
+  justify-self: start;
+  border: 1px solid #cfdbea;
+  border-radius: 8px;
+  padding: 8px 14px;
+  background: #fff;
+  color: #334155;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.edit-review:hover {
+  background: #f8fbff;
+  border-color: #afc4dd;
 }
 
 .login-hint {
