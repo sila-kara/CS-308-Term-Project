@@ -180,7 +180,7 @@ exports.createOrder = async (req, res) => {
 
     for (const item of checkoutItems) {
       const product = await Product.findById(item.productId);
-      if (!product)
+      if (!product || product.isDeleted)
         return res.status(404).json({ message: `Product not found: ${item.productId}` });
       if (product.quantity < item.quantity)
         return res.status(400).json({ message: `Insufficient stock for: ${product.name}` });

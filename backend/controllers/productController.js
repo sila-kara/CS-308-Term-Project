@@ -121,7 +121,7 @@ async function notifyRestockWishlistUsers(product) {
 exports.getProducts = async (req, res) => {
   try {
     const { search, category, sort } = req.query;
-    const filter = {};
+    const filter = { isDeleted: { $ne: true } };
 
     if (search) {
       filter.$or = [
@@ -156,7 +156,7 @@ exports.getProductById = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id).populate("category");
 
-    if (!product) {
+    if (!product || product.isDeleted) {
       return res.status(404).json({ message: "Product not found" });
     }
 

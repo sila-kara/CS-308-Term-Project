@@ -8,56 +8,78 @@
       <div v-if="loading" class="card" style="text-align:center;padding:40px">Loading your orders…</div>
 
       <template v-else-if="deliveredOrders.length">
-        <div v-for="order in deliveredOrders" :key="order._id" class="card order-card">
-          <div class="order-header">
-            <span class="inv">{{ order.invoiceNumber }}</span>
-            <span class="date">Delivered {{ formatDate(order.updatedAt) }}</span>
-          </div>
-
-          <!-- Return requested / pending -->
-          <div v-if="order.returnStatus === 'requested'" class="return-info pending">
-            <p class="return-badge">🕐 Return request pending</p>
-            <p class="hint">Your return request is being reviewed. You will be notified by email once it is approved or rejected.</p>
-          </div>
-
-          <!-- Return approved -->
-          <div v-else-if="order.returnStatus === 'approved'" class="return-info approved">
-            <p class="return-badge">✅ Return approved</p>
-            <p><strong>Cargo company:</strong> {{ order.returnCargoCompany }}</p>
-            <p><strong>Tracking code:</strong> <code>{{ order.returnCargoCode }}</code></p>
-            <p class="hint">Drop the parcel off at any {{ order.returnCargoCompany }} branch within 7 days using this code.</p>
-          </div>
-
-          <!-- Return rejected -->
-          <div v-else-if="order.returnStatus === 'rejected'" class="return-info rejected">
-            <p class="return-badge">❌ Return rejected</p>
-            <p v-if="order.returnRejectionReason" class="hint">Reason: {{ order.returnRejectionReason }}</p>
-          </div>
-
-          <!-- Window expired -->
-          <div v-else-if="!isWithinWindow(order)" class="expired-info">
-            ⏳ Return window has expired (30 days)
-          </div>
-
-          <!-- Initiate return -->
-          <template v-else>
-            <p class="select-label">Select items to return:</p>
-            <div v-for="(item, i) in order.items" :key="i" class="item-row">
-              <label>
-                <input type="checkbox" :value="returnItemValue(item)" v-model="selected[order._id]" />
-                {{ item.name }} × {{ item.quantity }}
-              </label>
+        <section v-if="returnHistoryOrders.length" class="history-section">
+          <h2>Return history</h2>
+          <div v-for="order in returnHistoryOrders" :key="`history-${order._id}`" class="card order-card">
+            <div class="order-header">
+              <span class="inv">{{ order.invoiceNumber }}</span>
+              <span class="date">Delivered {{ formatDate(deliveryDate(order)) }}</span>
             </div>
-            <button
-              class="btn primary"
-              :disabled="!selected[order._id]?.length || submitting[order._id]"
-              @click="submitReturn(order)"
-            >
-              {{ submitting[order._id] ? "Submitting…" : "Request Return" }}
-            </button>
-            <p v-if="errors[order._id]" class="err">{{ errors[order._id] }}</p>
-          </template>
-        </div>
+            <div v-if="order.returnStatus === 'requested'" class="return-info pending">
+              <p class="return-badge">🕐 Return request pending</p>
+              <p><strong>Requested items:</strong> {{ returnedItemNames(order) }}</p>
+              <p v-if="order.returnReason"><strong>Reason:</strong> {{ order.returnReason }}</p>
+              <p class="hint">Your return request is being reviewed. You will be notified by email once it is approved or rejected.</p>
+            </div>
+
+            <div v-else-if="order.returnStatus === 'approved'" class="return-info approved">
+              <p class="return-badge">✅ Return approved</p>
+              <p><strong>Requested items:</strong> {{ returnedItemNames(order) }}</p>
+              <p><strong>Refund amount:</strong> {{ money(order.returnRefundAmount) }}</p>
+              <p><strong>Cargo company:</strong> {{ order.returnCargoCompany }}</p>
+              <p><strong>Tracking code:</strong> <code>{{ order.returnCargoCode }}</code></p>
+              <p class="hint">Drop the parcel off at any {{ order.returnCargoCompany }} branch within 7 days using this code.</p>
+            </div>
+
+            <div v-else-if="order.returnStatus === 'rejected'" class="return-info rejected">
+              <p class="return-badge">❌ Return rejected</p>
+              <p><strong>Requested items:</strong> {{ returnedItemNames(order) }}</p>
+              <p v-if="order.returnReason"><strong>Reason:</strong> {{ order.returnReason }}</p>
+              <p v-if="order.returnRejectionReason" class="hint">Rejected: {{ order.returnRejectionReason }}</p>
+            </div>
+
+            <div v-else-if="order.returnStatus === 'refunded'" class="return-info refunded">
+              <p class="return-badge">💳 Refund completed</p>
+              <p><strong>Returned items:</strong> {{ returnedItemNames(order) }}</p>
+              <p><strong>Refund amount:</strong> {{ money(order.returnRefundAmount) }}</p>
+              <p v-if="order.returnRefundedAt" class="hint">Refunded on {{ formatDate(order.returnRefundedAt) }}.</p>
+            </div>
+          </div>
+        </section>
+
+        <section v-if="returnableOrders.length" class="history-section">
+          <h2>Available return requests</h2>
+          <div v-for="order in returnableOrders" :key="order._id" class="card order-card">
+            <div class="order-header">
+              <span class="inv">{{ order.invoiceNumber }}</span>
+              <span class="date">Delivered {{ formatDate(deliveryDate(order)) }}</span>
+            </div>
+
+            <!-- Window expired -->
+            <div v-if="!isWithinWindow(order)" class="expired-info">
+              ⏳ Return window has expired (30 days)
+            </div>
+
+            <!-- Initiate return -->
+            <template v-else>
+              <p class="select-label">Select items to return:</p>
+              <div v-for="(item, i) in order.items" :key="i" class="item-row">
+                <label>
+                  <input type="checkbox" :value="returnItemValue(item)" v-model="selected[order._id]" />
+                  {{ item.name }} × {{ item.quantity }}
+                </label>
+              </div>
+              <button
+                class="btn primary"
+                :disabled="!selected[order._id]?.length || submitting[order._id]"
+                @click="submitReturn(order)"
+              >
+                {{ submitting[order._id] ? "Submitting…" : "Request Return" }}
+              </button>
+              <p v-if="errors[order._id]" class="err">{{ errors[order._id] }}</p>
+            </template>
+          </div>
+        </section>
       </template>
 
       <div v-else class="card empty-state">
@@ -106,8 +128,20 @@ const deliveredOrders = computed(() =>
   orders.value.filter(o => o.status === "delivered")
 );
 
+const returnHistoryOrders = computed(() =>
+  deliveredOrders.value.filter(o => o.returnStatus)
+);
+
+const returnableOrders = computed(() =>
+  deliveredOrders.value.filter(o => !o.returnStatus)
+);
+
+function deliveryDate(order) {
+  return order.deliveredAt || order.updatedAt;
+}
+
 function isWithinWindow(order) {
-  const days = (Date.now() - new Date(order.updatedAt)) / (1000 * 60 * 60 * 24);
+  const days = (Date.now() - new Date(deliveryDate(order))) / (1000 * 60 * 60 * 24);
   return days <= 30;
 }
 
@@ -148,6 +182,22 @@ function formatDate(d) {
   return new Date(d).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 }
 
+function money(value) {
+  return `${Number(value || 0).toFixed(2)} TL`;
+}
+
+function returnedItemNames(order) {
+  const selectedItems = new Set((order.returnItems || []).map(item => String(item)));
+  const names = order.items
+    .filter(item => {
+      const productId = String(item.productId || item.id || item._id || "");
+      return selectedItems.has(productId) || selectedItems.has(item.name);
+    })
+    .map(item => `${item.name} × ${item.quantity}`);
+
+  return names.length ? names.join(", ") : "Not available";
+}
+
 onMounted(loadOrders);
 </script>
 
@@ -170,6 +220,13 @@ h1 { font-size: 1.9rem; margin: 0 0 8px; }
 }
 .card h2 { margin: 0 0 14px; font-size: 1.1rem; }
 
+.history-section { margin-bottom: 28px; }
+.history-section h2 {
+  margin: 0 0 12px;
+  font-size: 1.15rem;
+  color: #0f172a;
+}
+
 .order-card { display: grid; gap: 12px; }
 .order-header { display: flex; justify-content: space-between; align-items: center; }
 .inv { font-weight: 700; font-size: 0.95rem; }
@@ -182,10 +239,12 @@ h1 { font-size: 1.9rem; margin: 0 0 8px; }
 .return-info.pending  { background: #fefce8; border: 1px solid #fde68a; }
 .return-info.approved { background: #f0fdf4; border: 1px solid #bbf7d0; }
 .return-info.rejected { background: #fff1f2; border: 1px solid #fecdd3; }
+.return-info.refunded { background: #eff6ff; border: 1px solid #bfdbfe; }
 .return-badge { margin: 0 0 8px; font-weight: 700; }
 .return-info.pending  .return-badge { color: #92400e; }
 .return-info.approved .return-badge { color: #166534; }
 .return-info.rejected .return-badge { color: #9f1239; }
+.return-info.refunded .return-badge { color: #1d4ed8; }
 .return-info p { margin: 4px 0; font-size: 0.9rem; }
 code { background: #e2e8f0; border-radius: 4px; padding: 2px 6px; font-size: 0.88rem; }
 .hint { color: #475569; font-size: 0.82rem; margin-top: 6px !important; }
