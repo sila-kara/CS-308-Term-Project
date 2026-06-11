@@ -1,8 +1,11 @@
 // Run with: node seed.js
 require("dotenv").config();
+const bcrypt = require("bcryptjs");
 const mongoose = require("mongoose");
 const Product = require("./models/Product");
 const Category = require("./models/Category");
+const User = require("./models/User");
+const Order = require("./models/Order");
 
 const rawProducts = [
   // === FICTION ===
@@ -74,9 +77,330 @@ const rawProducts = [
   { name: "How to Win Friends and Influence People", model: "Updated Edition", serialNumber: "ISBN-9780671027032", description: "Dale Carnegie's classic guide to better communication and relationship building.", category: "Self-Help", quantity: 32, price: 58.00, warranty: "Exchange guarantee", distributor: "Dale Carnegie", rating: 4.7, ratingCount: 9870 },
 ];
 
+const demoCatalogProducts = [
+  {
+    name: "Product A",
+    model: "Paperback",
+    serialNumber: "DEMO-SEED-PRODUCT-A",
+    description: "A gripping literary mystery set in a coastal town, following a journalist who uncovers secrets buried for decades.",
+    category: "Fiction",
+    quantity: 28,
+    price: 54.99,
+    cost: 22.0,
+    warranty: "Exchange guarantee",
+    distributor: "Northwind Press",
+    author: "Elena Marlow",
+    rating: 4.6,
+    ratingCount: 142,
+  },
+  {
+    name: "Product B",
+    model: "Hardcover",
+    serialNumber: "DEMO-SEED-PRODUCT-B",
+    description: "An accessible guide to modern astronomy covering exoplanets, black holes, and the latest space telescope discoveries.",
+    category: "Science",
+    quantity: 19,
+    price: 89.5,
+    cost: 35.0,
+    warranty: "Exchange guarantee",
+    distributor: "Orbit Science Books",
+    author: "Dr. Samir Patel",
+    rating: 4.7,
+    ratingCount: 318,
+  },
+  {
+    name: "Product C",
+    model: "1st Edition",
+    serialNumber: "DEMO-SEED-PRODUCT-C",
+    description: "A practical introduction to full-stack web development with hands-on projects in JavaScript, APIs, and databases.",
+    category: "Technology",
+    quantity: 14,
+    price: 119.0,
+    cost: 48.0,
+    warranty: "Exchange guarantee",
+    distributor: "CodeCraft Publishing",
+    author: "Morgan Lee",
+    rating: 4.5,
+    ratingCount: 267,
+  },
+  {
+    name: "Product D",
+    model: "Illustrated Edition",
+    serialNumber: "DEMO-SEED-PRODUCT-D",
+    description: "A richly illustrated chronicle of the Silk Road, tracing trade, culture, and conflict across centuries.",
+    category: "History",
+    quantity: 22,
+    price: 74.25,
+    cost: 30.0,
+    warranty: "Exchange guarantee",
+    distributor: "Heritage Archives",
+    author: "Prof. Aylin Demir",
+    rating: 4.4,
+    ratingCount: 96,
+  },
+  {
+    name: "Product E",
+    model: "Pocket Edition",
+    serialNumber: "DEMO-SEED-PRODUCT-E",
+    description: "A concise exploration of ethical philosophy, from Aristotle to contemporary debates on justice and responsibility.",
+    category: "Philosophy",
+    quantity: 31,
+    price: 42.0,
+    cost: 16.0,
+    warranty: "Exchange guarantee",
+    distributor: "Stoa Books",
+    author: "Thomas Greer",
+    rating: 4.3,
+    ratingCount: 58,
+  },
+  {
+    name: "Product F",
+    model: "Workbook Edition",
+    serialNumber: "DEMO-SEED-PRODUCT-F",
+    description: "A step-by-step productivity system for building better routines, managing focus, and sustaining motivation.",
+    category: "Self-Help",
+    quantity: 36,
+    price: 59.99,
+    cost: 24.0,
+    warranty: "Exchange guarantee",
+    distributor: "BrightPath Media",
+    author: "Jordan Ellis",
+    rating: 4.8,
+    ratingCount: 512,
+  },
+  {
+    name: "Product G",
+    model: "Paperback",
+    serialNumber: "DEMO-SEED-PRODUCT-G",
+    description: "A heartfelt contemporary romance about second chances, small-town life, and finding love when you least expect it.",
+    category: "Romance",
+    quantity: 27,
+    price: 48.5,
+    cost: 18.0,
+    warranty: "Exchange guarantee",
+    distributor: "Rosewood Stories",
+    author: "Claire Bennett",
+    rating: 4.6,
+    ratingCount: 203,
+  },
+  {
+    name: "Product H",
+    model: "Hardcover",
+    serialNumber: "DEMO-SEED-PRODUCT-H",
+    description: "The authorized biography of a pioneering tech entrepreneur, from garage startup to global industry leader.",
+    category: "Biography",
+    quantity: 17,
+    price: 99.0,
+    cost: 40.0,
+    warranty: "Exchange guarantee",
+    distributor: "Summit Biographies",
+    author: "Rachel Kim",
+    rating: 4.7,
+    ratingCount: 184,
+  },
+];
+
+const demoCustomers = [
+  { name: "Alice Demo", email: "alice.demo@bookworld.test" },
+  { name: "Bob Demo", email: "bob.demo@bookworld.test" },
+  { name: "Carol Demo", email: "carol.demo@bookworld.test" },
+];
+
+const SHIPPING_FEE = 29.99;
+const FREE_SHIPPING_THRESHOLD = 250;
+const TAX_RATE = 0.1;
+
 function openLibraryCover(serialNumber) {
   const isbn = serialNumber.replace(/^ISBN-/, "");
   return `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`;
+}
+
+function roundMoney(value) {
+  return Math.round(value * 100) / 100;
+}
+
+function calculateOrderTotals(items) {
+  const subtotal = roundMoney(
+    items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  );
+  const shipping = subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : SHIPPING_FEE;
+  const tax = roundMoney(subtotal * TAX_RATE);
+  const total = roundMoney(subtotal + shipping + tax);
+  return { subtotal, shipping, tax, total };
+}
+
+async function ensureCategory(categoryMap, name) {
+  if (categoryMap[name]) return categoryMap[name];
+  const cat = await Category.findOneAndUpdate(
+    { name },
+    { name },
+    { upsert: true, new: true }
+  );
+  categoryMap[name] = cat._id;
+  return cat._id;
+}
+
+async function seedDemoProducts(categoryMap) {
+  let inserted = 0;
+  let skipped = 0;
+
+  for (const product of demoCatalogProducts) {
+    const exists = await Product.findOne({
+      $or: [{ name: product.name }, { serialNumber: product.serialNumber }],
+    });
+    if (exists) {
+      skipped += 1;
+      continue;
+    }
+
+    await ensureCategory(categoryMap, product.category);
+    await Product.create({
+      ...product,
+      category: categoryMap[product.category],
+      image: openLibraryCover(product.serialNumber),
+    });
+    inserted += 1;
+  }
+
+  console.log(`Demo catalog: inserted ${inserted}, skipped ${skipped} (already exist)`);
+}
+
+async function upsertDemoCustomers() {
+  const password = await bcrypt.hash("DemoPass123!", 10);
+  const customerIds = {};
+
+  for (const customer of demoCustomers) {
+    const user = await User.findOneAndUpdate(
+      { email: customer.email },
+      {
+        name: customer.name,
+        email: customer.email,
+        password,
+        role: "customer",
+      },
+      { upsert: true, new: true, runValidators: true }
+    );
+    customerIds[customer.email] = user._id;
+  }
+
+  console.log(`Ready ${demoCustomers.length} demo customer accounts`);
+  return customerIds;
+}
+
+async function seedDemoOrders(customerIds) {
+  const productByName = {};
+  for (const product of demoCatalogProducts) {
+    const doc = await Product.findOne({ name: product.name });
+    if (doc) productByName[product.name] = doc;
+  }
+
+  const demoOrders = [
+    {
+      invoiceNumber: "SEED-DEMO-INV-001",
+      customerEmail: "alice.demo@bookworld.test",
+      status: "processing",
+      deliveryAddress: "12 Demo Street, Istanbul",
+      items: [{ productName: "Product A", quantity: 1 }],
+    },
+    {
+      invoiceNumber: "SEED-DEMO-INV-002",
+      customerEmail: "bob.demo@bookworld.test",
+      status: "in-transit",
+      deliveryAddress: "45 Sample Avenue, Ankara",
+      items: [
+        { productName: "Product B", quantity: 1 },
+        { productName: "Product C", quantity: 2 },
+      ],
+    },
+    {
+      invoiceNumber: "SEED-DEMO-INV-003",
+      customerEmail: "carol.demo@bookworld.test",
+      status: "delivered",
+      deliveredAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      deliveryAddress: "78 Harbor Road, Izmir",
+      items: [{ productName: "Product D", quantity: 1 }],
+    },
+    {
+      invoiceNumber: "SEED-DEMO-INV-004",
+      customerEmail: "alice.demo@bookworld.test",
+      status: "delivered",
+      deliveredAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+      deliveryAddress: "12 Demo Street, Istanbul",
+      items: [
+        { productName: "Product E", quantity: 1 },
+        { productName: "Product F", quantity: 1 },
+      ],
+    },
+    {
+      invoiceNumber: "SEED-DEMO-INV-005",
+      customerEmail: "bob.demo@bookworld.test",
+      status: "processing",
+      deliveryAddress: "45 Sample Avenue, Ankara",
+      items: [{ productName: "Product G", quantity: 1 }],
+    },
+    {
+      invoiceNumber: "SEED-DEMO-INV-006",
+      customerEmail: "carol.demo@bookworld.test",
+      status: "in-transit",
+      deliveryAddress: "78 Harbor Road, Izmir",
+      items: [{ productName: "Product H", quantity: 1 }],
+    },
+  ];
+
+  let inserted = 0;
+  let skipped = 0;
+
+  for (const orderSeed of demoOrders) {
+    const exists = await Order.findOne({ invoiceNumber: orderSeed.invoiceNumber });
+    if (exists) {
+      skipped += 1;
+      continue;
+    }
+
+    const userId = customerIds[orderSeed.customerEmail];
+    if (!userId) {
+      console.warn(`Skipping ${orderSeed.invoiceNumber}: demo customer not found`);
+      continue;
+    }
+
+    const orderItems = [];
+    for (const item of orderSeed.items) {
+      const product = productByName[item.productName];
+      if (!product) {
+        console.warn(`Skipping ${orderSeed.invoiceNumber}: ${item.productName} not found`);
+        orderItems.length = 0;
+        break;
+      }
+      orderItems.push({
+        productId: product._id,
+        name: product.name,
+        price: product.price,
+        cost: product.cost || 0,
+        quantity: item.quantity,
+      });
+    }
+
+    if (!orderItems.length) continue;
+
+    const totals = calculateOrderTotals(orderItems);
+    await Order.create({
+      userId,
+      items: orderItems,
+      subtotal: totals.subtotal,
+      shipping: totals.shipping,
+      tax: totals.tax,
+      total: totals.total,
+      paymentMethod: "Mock Visa",
+      cardLast4: "4242",
+      deliveryAddress: orderSeed.deliveryAddress,
+      status: orderSeed.status,
+      invoiceNumber: orderSeed.invoiceNumber,
+      deliveredAt: orderSeed.deliveredAt || null,
+    });
+    inserted += 1;
+  }
+
+  console.log(`Demo orders: inserted ${inserted}, skipped ${skipped} (already exist)`);
 }
 
 async function seed() {
@@ -108,6 +432,10 @@ async function seed() {
 
   await Product.insertMany(docs);
   console.log(`Seeded ${docs.length} products`);
+
+  await seedDemoProducts(categoryMap);
+  const customerIds = await upsertDemoCustomers();
+  await seedDemoOrders(customerIds);
 
   await mongoose.disconnect();
   console.log("Done");
