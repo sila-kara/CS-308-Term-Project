@@ -39,6 +39,18 @@ describe("addToCart", () => {
     const product = makeProduct(1, 10, 0);
     expect(() => addToCart([], product, 1)).toThrow("Insufficient stock");
   });
+
+  it("throws when quantity is not a number", () => {
+    const product = makeProduct(1, 10, 5);
+    expect(() => addToCart([], product, "abc")).toThrow("Invalid quantity");
+    expect(() => addToCart([], product, NaN)).toThrow("Invalid quantity");
+  });
+
+  it("coerces a numeric string quantity to a number", () => {
+    const product = makeProduct(1, 10, 5);
+    const cart = addToCart([], product, "3");
+    expect(cart[0].quantity).toBe(3);
+  });
 });
 
 describe("removeFromCart", () => {
@@ -104,6 +116,33 @@ describe("updateQuantity", () => {
     const cart = [{ product, quantity: 1 }];
     const result = updateQuantity(cart, 1, 5);
     expect(result[0].quantity).toBe(5);
+  });
+
+  it("throws when new quantity is not a number", () => {
+    const product = makeProduct(1, 10, 5);
+    const cart = [{ product, quantity: 2 }];
+    expect(() => updateQuantity(cart, 1, "abc")).toThrow("Invalid quantity");
+    expect(() => updateQuantity(cart, 1, NaN)).toThrow("Invalid quantity");
+    expect(() => updateQuantity(cart, 1, undefined)).toThrow("Invalid quantity");
+  });
+
+  it("does not corrupt the cart total after rejecting invalid quantity", () => {
+    const product = makeProduct(1, 10, 5);
+    let cart = [{ product, quantity: 2 }];
+    try {
+      cart = updateQuantity(cart, 1, NaN);
+    } catch {
+      // cart should remain unchanged
+    }
+    expect(cart[0].quantity).toBe(2);
+    expect(calculateTotal(cart)).toBe(20);
+  });
+
+  it("coerces a numeric string quantity to a number", () => {
+    const product = makeProduct(1, 10, 10);
+    const cart = [{ product, quantity: 2 }];
+    const result = updateQuantity(cart, 1, "4");
+    expect(result[0].quantity).toBe(4);
   });
 });
 

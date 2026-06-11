@@ -86,6 +86,7 @@
                   <input
                     type="number"
                     min="1"
+                    :max="item.stock"
                     :value="item.quantity"
                     @change="onQty(item.id, $event.target.value)"
                   />

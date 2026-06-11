@@ -94,6 +94,7 @@ function removeFromCart(productId) {
 /**
  * UPDATE_QUANTITY
  * Sets the quantity of a cart item to an explicit value.
+ * - Ignores non-numeric input (keeps the current quantity).
  * - Removes the item if newQty ≤ 0.
  * - Caps newQty at the product's available stock.
  */
@@ -102,6 +103,10 @@ function updateItemQuantity(productId, newQty) {
   if (!item) return;
 
   const qty = Math.floor(Number(newQty));
+
+  // Guard: ignore values that don't parse to a real number (e.g. "abc"),
+  // otherwise NaN would corrupt the cart count and total
+  if (!Number.isFinite(qty)) return;
 
   // Remove item when quantity drops to zero or below
   if (qty <= 0) {

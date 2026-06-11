@@ -1,10 +1,14 @@
 export function addToCart(cart, product, quantity) {
-  if (quantity > product.stock) {
+  const qty = Number(quantity);
+  if (!Number.isFinite(qty)) {
+    throw new Error("Invalid quantity");
+  }
+  if (qty > product.stock) {
     throw new Error("Insufficient stock");
   }
   const existing = cart.find((item) => item.product.id === product.id);
   if (existing) {
-    const newQty = existing.quantity + quantity;
+    const newQty = existing.quantity + qty;
     if (newQty > product.stock) {
       throw new Error("Insufficient stock");
     }
@@ -12,7 +16,7 @@ export function addToCart(cart, product, quantity) {
       item.product.id === product.id ? { ...item, quantity: newQty } : item
     );
   }
-  return [...cart, { product, quantity }];
+  return [...cart, { product, quantity: qty }];
 }
 
 export function removeFromCart(cart, productId) {
@@ -24,14 +28,18 @@ export function updateQuantity(cart, productId, newQty) {
   if (!item) {
     throw new Error("Product not found in cart");
   }
-  if (newQty > item.product.stock) {
+  const qty = Number(newQty);
+  if (!Number.isFinite(qty)) {
+    throw new Error("Invalid quantity");
+  }
+  if (qty > item.product.stock) {
     throw new Error("Insufficient stock");
   }
-  if (newQty <= 0) {
+  if (qty <= 0) {
     return removeFromCart(cart, productId);
   }
   return cart.map((i) =>
-    i.product.id === productId ? { ...i, quantity: newQty } : i
+    i.product.id === productId ? { ...i, quantity: qty } : i
   );
 }
 
