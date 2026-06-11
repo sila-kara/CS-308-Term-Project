@@ -24,6 +24,15 @@ async function fetchMyReviewForProduct(productId) {
   }
 }
 
+async function checkReviewEligibility(productId) {
+  try {
+    const { data } = await api.get(`/comments/eligibility/${productId}`);
+    return data.eligible === true;
+  } catch {
+    return false;
+  }
+}
+
 function listApprovedForProduct(productId) {
   return state.reviews.filter(r => String(r.productId) === String(productId));
 }
@@ -79,6 +88,7 @@ export function useCommentsStore() {
     state,
     fetchApprovedForProduct,
     fetchMyReviewForProduct,
+    checkReviewEligibility,
     listApprovedForProduct,
     fetchPending,
     listPending,

@@ -2,6 +2,15 @@ const Comment = require("../models/Comment");
 const Product = require("../models/Product");
 const Order = require("../models/Order");
 
+async function userHasDeliveredOrderForProduct(userId, productId) {
+  const deliveredOrder = await Order.findOne({
+    userId,
+    status: "delivered",
+    "items.productId": productId,
+  });
+  return !!deliveredOrder;
+}
+
 async function updateProductRating(productId) {
   const reviews = await Comment.find({ productId });
 
@@ -49,15 +58,11 @@ exports.createComment = async (req, res) => {
       });
     }
 
-    const deliveredOrder = await Order.findOne({
-      userId,
-      status: "delivered",
-      "items.productId": productId
-    });
+    const canReview = await userHasDeliveredOrderForProduct(userId, productId);
 
-    if (!deliveredOrder) {
+    if (!canReview) {
       return res.status(403).json({
-        message: "You can review this product only after it has been delivered."
+        message: "You can only review products you have received."
       });
     }
 
@@ -93,6 +98,23 @@ exports.createComment = async (req, res) => {
       comment,
       updated: isUpdate
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.checkReviewEligibility = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const userId = req.user?.id;
+
+    if (!userId || !productId) {
+      return res.status(400).json({ message: "productId is required" });
+    }
+
+    const eligible = await userHasDeliveredOrderForProduct(userId, productId);
+
+    res.status(200).json({ eligible });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

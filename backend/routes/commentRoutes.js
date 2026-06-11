@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const {
   createComment,
+  checkReviewEligibility,
   getMyCommentByProduct,
   getApprovedCommentsByProduct,
   approveComment,
@@ -14,6 +15,7 @@ const { authMiddleware, requireRole } = require("../middleware/auth");
 router.post("/", authMiddleware, createComment);
 router.get("/pending", authMiddleware, requireRole("product_manager"), getPendingComments);
 router.get("/average/:productId", getAverageRating);
+router.get("/eligibility/:productId", authMiddleware, checkReviewEligibility);
 router.get("/mine/:productId", authMiddleware, getMyCommentByProduct);
 router.get("/:productId", getApprovedCommentsByProduct);
 router.patch("/approve/:commentId", authMiddleware, requireRole("product_manager"), approveComment);

@@ -120,7 +120,7 @@
       </ul>
       <p v-else class="no-reviews">No reviews yet. Be the first.</p>
 
-      <div v-if="isLoggedIn" class="review-form">
+      <div v-if="isLoggedIn && canReview" class="review-form">
         <h3>{{ myReview ? "Edit your review" : "Write a review" }}</h3>
         <label>
           Rating
@@ -168,6 +168,7 @@ const { isLoggedIn } = useAuthStore();
 const {
   fetchApprovedForProduct,
   fetchMyReviewForProduct,
+  checkReviewEligibility,
   listApprovedForProduct,
   submitReview: postReview
 } =
@@ -178,6 +179,7 @@ const isWishlisted = computed(() => product.value ? isInWishlist(product.value._
 
 const product = ref(null);
 const myReview = ref(null);
+const canReview = ref(false);
 const hasDiscount = computed(() => isOnSale(product.value));
 const displayPrice = computed(() => effectivePrice(product.value));
 
@@ -206,13 +208,19 @@ async function loadMyReview(productId) {
   }
 }
 
+async function loadReviewEligibility(productId) {
+  canReview.value = false;
+  if (!isLoggedIn.value) return;
+  canReview.value = await checkReviewEligibility(productId);
+}
+
 async function loadProductDetail(id) {
   product.value = await fetchProductById(id);
   if (!product.value) return;
 
   const productId = product.value._id || product.value.id;
   await fetchApprovedForProduct(productId);
-  await loadMyReview(productId);
+  await Promise.all([loadMyReview(productId), loadReviewEligibility(productId)]);
 }
 
 onMounted(async () => {
